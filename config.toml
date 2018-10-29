@@ -1,0 +1,15 @@
+[server]
+port = "8080"
+api_version = "v1"
+
+[aws]
+access_key = ""
+secret_key = ""
+
+[kms]
+main_region = "us-east-1"
+backup_regions = ["us-east-2", "us-west-1"]
+
+[dynamodb]
+region = "us-east-1"
+table_name = "kms_keys"

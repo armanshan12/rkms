@@ -8,11 +8,12 @@ import (
 const apiVersion = "v1" //TODO: put in config file
 
 var rkmsHandler = RKMS{}
+var config = LoadConfiguration()
 
 func main() {
-	path := "/api/" + apiVersion + "/key"
+	path := "/api/" + config.Server.APIVersion + "/key"
 	http.HandleFunc(path, getKey)
-	err := http.ListenAndServe(":8080", nil) //TODO: put port in config file
+	err := http.ListenAndServe(":"+config.Server.Port, nil)
 	if err != nil {
 		log.Fatal("ListenAndServe: ", err)
 	}
