@@ -1,17 +1,13 @@
 package main
 
 import (
-	"encoding/json"
 	"log"
 	"net/http"
 )
 
-type errorResponse struct {
-	ErrorType    string `json:"error_type"`
-	ErrorMessage string `json:"error_message"`
-}
-
 const apiVersion = "v1" //TODO: put in config file
+
+var rkmsHandler = RKMS{}
 
 func main() {
 	path := "/api/" + apiVersion + "/key"
@@ -25,15 +21,22 @@ func main() {
 func getKey(w http.ResponseWriter, r *http.Request) {
 	id := r.URL.Query().Get("id")
 	if id == "" {
-		w.WriteHeader(http.StatusBadRequest)
-
-		resp := errorResponse{"BadRequest", "id query parameter is required"}
-		b, err := json.Marshal(resp)
-		if err != nil {
-			log.Fatal("Failed to marshal errorResponse object to JSON")
-			return
-		}
-
+		b := ConstructErrorResponse("BadRequest", "id query parameter is required")
 		w.Write(b)
+		w.WriteHeader(http.StatusBadRequest)
+		return
 	}
+
+	key, err := rkmsHandler.GetKey(id)
+	if err != nil {
+		//TODO: do a better error handling based on the type of error
+		b := ConstructErrorResponse("InternalError", "Internal server error occurred")
+		w.Write(b)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	b := ConstructGetKeyResponse(key)
+	w.Write(b)
+	w.WriteHeader(http.StatusOK)
 }
