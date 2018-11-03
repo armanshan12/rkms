@@ -5,15 +5,20 @@ import (
 	"net/http"
 )
 
-const apiVersion = "v1" //TODO: put in config file
-
 var config = LoadConfiguration()
-var rkmsHandler = NewRKMSWithDynamoDB(config.AWS, config.KMS, config.DynamoDB)
+var rkmsHandler *RKMS
 
 func main() {
+	rkms, err := NewRKMSWithDynamoDB(config.KMS, config.DynamoDB)
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+	rkmsHandler = rkms
+
 	path := "/api/" + config.Server.APIVersion + "/key"
 	http.HandleFunc(path, getKey)
-	err := http.ListenAndServe(":"+config.Server.Port, nil)
+	err = http.ListenAndServe(":"+config.Server.Port, nil)
 	if err != nil {
 		log.Fatal("ListenAndServe: ", err)
 	}

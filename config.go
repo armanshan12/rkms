@@ -12,11 +12,6 @@ type ServerConfig struct {
 	APIVersion string `mapstructure:"api_version"`
 }
 
-type AWSConfig struct {
-	AccessKey string `mapstructure:"access_key"`
-	SecretKey string `mapstructure:"secret_key"`
-}
-
 type KMSConfig struct {
 	Regions []string
 }
@@ -28,7 +23,6 @@ type DynamoDBConfig struct {
 
 type Configuration struct {
 	Server   ServerConfig
-	AWS      AWSConfig
 	KMS      KMSConfig
 	DynamoDB DynamoDBConfig
 }
