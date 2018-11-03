@@ -7,8 +7,7 @@ access_key = ""
 secret_key = ""
 
 [kms]
-main_region = "us-east-1"
-backup_regions = ["us-east-2", "us-west-1"]
+regions = ["us-east-1", "us-east-2", "us-west-1"]
 
 [dynamodb]
 region = "us-east-1"

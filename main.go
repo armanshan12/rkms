@@ -7,8 +7,8 @@ import (
 
 const apiVersion = "v1" //TODO: put in config file
 
-var rkmsHandler = RKMS{}
 var config = LoadConfiguration()
+var rkmsHandler = NewRKMSWithDynamoDB(config.AWS, config.KMS, config.DynamoDB)
 
 func main() {
 	path := "/api/" + config.Server.APIVersion + "/key"
