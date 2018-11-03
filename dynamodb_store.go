@@ -22,7 +22,7 @@ func NewDynamoDBStore(dynamoDBConfig DynamoDBConfig) (*DynamoDBStore, error) {
 	})
 
 	if err != nil {
-		log.Fatal(err)
+		log.Print(err)
 		return nil, err
 	}
 
@@ -32,7 +32,14 @@ func NewDynamoDBStore(dynamoDBConfig DynamoDBConfig) (*DynamoDBStore, error) {
 
 // GetValue retrieves the value for the given key
 func (s *DynamoDBStore) GetValue(id string) ([]map[string]string, error) {
+	input := &dynamodb.DescribeTableInput{TableName: &s.tableName}
+	output, err := s.client.DescribeTable(input)
+	if err != nil {
+		log.Print(err)
+		return nil, err
+	}
 
+	log.Printf("Table's ARN is %s\n", *output.Table.TableArn)
 	return nil, nil
 }
 

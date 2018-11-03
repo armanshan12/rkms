@@ -22,13 +22,13 @@ type RKMS struct {
 func NewRKMSWithDynamoDB(kmsConfig KMSConfig, dynamoDBConfig DynamoDBConfig) (*RKMS, error) {
 	if len(kmsConfig.Regions) < MinimumKMSRegions {
 		err := fmt.Errorf("a minimmum of %d KMS regions is required", MinimumKMSRegions)
-		log.Fatal(err)
+		log.Print(err)
 		return nil, err
 	}
 
 	store, err := NewDynamoDBStore(dynamoDBConfig)
 	if err != nil {
-		log.Fatal(err)
+		log.Print(err)
 		return nil, err
 	}
 
@@ -37,7 +37,7 @@ func NewRKMSWithDynamoDB(kmsConfig KMSConfig, dynamoDBConfig DynamoDBConfig) (*R
 	})
 
 	if err != nil {
-		log.Fatal(err)
+		log.Print(err)
 		return nil, err
 	}
 
@@ -48,7 +48,13 @@ func NewRKMSWithDynamoDB(kmsConfig KMSConfig, dynamoDBConfig DynamoDBConfig) (*R
 
 // GetKey retrieves the key assosicated with the given id.
 // If a key is not found in the store, a key is generated for the given id.
-func (r *RKMS) GetKey(id string) (string, error) {
+func (r *RKMS) GetKey(id string) (*string, error) {
+	value, err := r.store.GetValue(id)
+	if err != nil {
+		log.Print(err)
+		return nil, err
+	}
 
-	return "dummy key", nil
+	res := fmt.Sprintf("%+v\n", value)
+	return &res, nil
 }

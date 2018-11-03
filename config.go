@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 
 	"github.com/spf13/viper"
@@ -34,7 +33,7 @@ func LoadConfiguration() *Configuration {
 
 	err := viper.ReadInConfig()
 	if err != nil {
-		panic(fmt.Errorf("fatal error while reading config file: %s", err))
+		log.Fatalf("fatal error while reading config file: %s", err)
 	}
 
 	config := new(Configuration)

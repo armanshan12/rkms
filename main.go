@@ -36,7 +36,7 @@ func getKey(w http.ResponseWriter, r *http.Request) {
 	key, err := rkmsHandler.GetKey(id)
 	if err != nil {
 		//TODO: do a better error handling based on the type of error
-		b := ConstructErrorResponse("InternalError", "Internal server error occurred")
+		b := ConstructErrorResponse("InternalError", err.Error())
 		w.Write(b)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
