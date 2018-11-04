@@ -73,8 +73,8 @@ func (r *RKMS) GetKey(id string) (*string, error) {
 
 	if value != nil { //a data key already exist for the given id
 		//TODO: make parallelism configurable (e.g. request all KMS regions at the same time for the decrypted data key)
-		//TODO: *** make this for loop on top of Regions to preserve the order
-		for region, client := range r.clients {
+		for _, region := range r.regions {
+			client := r.clients[region]
 			result, err := client.Decrypt(&kms.DecryptInput{
 				CiphertextBlob: []byte(value[region]),
 			})
