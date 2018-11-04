@@ -113,6 +113,7 @@ func (r *RKMS) GetKey(id string) (*string, error) {
 			continue
 		}
 
+		//TODO: parallelize encryptDataKey calls to every region
 		ciphertext, err := r.encryptDataKey(plaintextDataKey, &region)
 		if err != nil {
 			logger.Errorf("failed to encrypt data key in %s region: %s", region, err)
@@ -155,6 +156,17 @@ func (r *RKMS) createDataKey() (*string, *string, *string, error) {
 }
 
 func (r *RKMS) encryptDataKey(dataKey *string, region *string) (*string, error) {
-	//TODO:
-	return nil, nil
+	client := r.clients[*region]
+	result, err := client.Encrypt(&kms.EncryptInput{
+		KeyId:     r.keyIds[*region],
+		Plaintext: []byte(*dataKey),
+	})
+
+	if err != nil { //failed to create data key in this region
+		logger.Print(err)
+		return nil, err
+	}
+
+	ciphertext := string(result.CiphertextBlob)
+	return &ciphertext, nil
 }
