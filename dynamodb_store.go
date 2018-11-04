@@ -1,12 +1,11 @@
 package main
 
 import (
-	"log"
-
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
+	logger "github.com/sirupsen/logrus"
 )
 
 // DynamoDBStore - a DynamoDB implementation of a key/value store for KMS-related data
@@ -28,7 +27,7 @@ func NewDynamoDBStore(dynamoDBConfig DynamoDBConfig) (*DynamoDBStore, error) {
 	})
 
 	if err != nil {
-		log.Print(err)
+		logger.Print(err)
 		return nil, err
 	}
 
@@ -49,7 +48,7 @@ func (s *DynamoDBStore) GetValue(id string) (map[string]string, error) {
 	})
 
 	if err != nil {
-		log.Print(err)
+		logger.Print(err)
 		return nil, err
 	}
 
@@ -60,7 +59,7 @@ func (s *DynamoDBStore) GetValue(id string) (map[string]string, error) {
 	item := item{}
 	err = dynamodbattribute.UnmarshalMap(result.Item, &item)
 	if err != nil {
-		log.Print(err)
+		logger.Print(err)
 		return nil, err
 	}
 
@@ -78,7 +77,7 @@ func (s *DynamoDBStore) SetValue(id string, encryptedKeysMap map[string]string) 
 
 	_, err = s.client.PutItem(input)
 	if err != nil {
-		log.Print(err)
+		logger.Print(err)
 		return err
 	}
 

@@ -2,11 +2,11 @@ package main
 
 import (
 	"fmt"
-	"log"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/kms"
+	logger "github.com/sirupsen/logrus"
 )
 
 const MinimumKMSRegions = 3
@@ -23,13 +23,13 @@ type RKMS struct {
 func NewRKMSWithDynamoDB(kmsConfig KMSConfig, dynamoDBConfig DynamoDBConfig) (*RKMS, error) {
 	store, err := NewDynamoDBStore(dynamoDBConfig)
 	if err != nil {
-		log.Print(err)
+		logger.Print(err)
 		return nil, err
 	}
 
 	clients, err := getKMSClientsForRegions(kmsConfig.Regions)
 	if err != nil {
-		log.Print(err)
+		logger.Print(err)
 		return nil, err
 	}
 
@@ -67,7 +67,7 @@ func getKMSClientForRegion(region string) (*kms.KMS, error) {
 func (r *RKMS) GetKey(id string) (*string, error) {
 	value, err := r.store.GetValue(id)
 	if err != nil {
-		log.Print(err)
+		logger.Print(err)
 		return nil, err
 	}
 
@@ -80,7 +80,7 @@ func (r *RKMS) GetKey(id string) (*string, error) {
 			})
 
 			if err != nil { //failed to decrypt in this region
-				log.Print(err)
+				logger.Print(err)
 				continue
 			}
 

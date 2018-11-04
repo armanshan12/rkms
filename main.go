@@ -1,8 +1,9 @@
 package main
 
 import (
-	"log"
 	"net/http"
+
+	logger "github.com/sirupsen/logrus"
 )
 
 var config = LoadConfiguration()
@@ -11,7 +12,7 @@ var rkmsHandler *RKMS
 func main() {
 	rkms, err := NewRKMSWithDynamoDB(config.KMS, config.DynamoDB)
 	if err != nil {
-		log.Fatal(err)
+		logger.Fatal(err)
 		return
 	}
 	rkmsHandler = rkms
@@ -20,7 +21,7 @@ func main() {
 	http.HandleFunc(path, getKey)
 	err = http.ListenAndServe(":"+config.Server.Port, nil)
 	if err != nil {
-		log.Fatal("ListenAndServe: ", err)
+		logger.Fatal("ListenAndServe: ", err)
 	}
 }
 

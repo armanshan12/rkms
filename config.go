@@ -2,8 +2,8 @@ package main
 
 import (
 	"fmt"
-	"log"
 
+	logger "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
 
@@ -34,15 +34,15 @@ func LoadConfiguration() *Configuration {
 	viper.SetConfigType("toml")
 
 	if err := viper.ReadInConfig(); err != nil {
-		log.Fatalf("fatal error while reading config file: %s", err)
+		logger.Fatalf("fatal error while reading config file: %s", err)
 	}
 
 	config := new(Configuration)
 	viper.Unmarshal(&config)
-	log.Printf("Loaded configuration: %s\n", *config)
+	logger.Infof("loaded configuration: %+v\n", *config)
 
 	if err := verifyKMSConfig(config.KMS); err != nil {
-		log.Fatal(err)
+		logger.Fatal(err)
 	}
 
 	return config
@@ -59,7 +59,7 @@ func verifyKMSConfig(kmsConfig KMSConfig) error {
 
 	for _, region := range kmsConfig.Regions {
 		if kmsConfig.KeyIds[region] == nil {
-			return fmt.Errorf("region %s exists in KMS regions array but not in the KMS KeyIds map")
+			return fmt.Errorf("region %s exists in KMS regions array but not in the KMS KeyIds map", region)
 		}
 	}
 
