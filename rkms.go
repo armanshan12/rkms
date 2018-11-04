@@ -9,6 +9,7 @@ import (
 	logger "github.com/sirupsen/logrus"
 )
 
+// MinimumKMSRegions is the minimum number of KMS regions needed to run a RKMS service
 const MinimumKMSRegions = 3
 
 // RKMS - Implementation of redundant KMS logic

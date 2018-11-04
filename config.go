@@ -7,27 +7,32 @@ import (
 	"github.com/spf13/viper"
 )
 
+// ServerConfig represents the configuration needed for the server
 type ServerConfig struct {
 	Port       string
 	APIVersion string `mapstructure:"api_version"`
 }
 
+// KMSConfig contains information for KMS services
 type KMSConfig struct {
 	Regions []string
 	KeyIds  map[string]*string `mapstructure:"key_ids"`
 }
 
+// DynamoDBConfig contains information for DynamoDB used for RKMS
 type DynamoDBConfig struct {
 	Region    string `mapstructure:"region"`
 	TableName string `mapstructure:"table_name"`
 }
 
+// Configuration represents all the configuration information this application needss
 type Configuration struct {
 	Server   ServerConfig
 	KMS      KMSConfig
 	DynamoDB DynamoDBConfig
 }
 
+// LoadConfiguration loads config file into memory and creates a Configuration object out of the information
 func LoadConfiguration() *Configuration {
 	viper.SetConfigName("config")
 	viper.AddConfigPath(".")
