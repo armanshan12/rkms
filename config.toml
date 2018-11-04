@@ -1,10 +1,19 @@
 [server]
-port = "8080"
-api_version = "v1"
+  port = "8080"
+  api_version = "v1"
 
 [kms]
-regions = ["us-east-1", "us-east-2", "us-west-1"]
+  regions = [
+    "us-east-1",
+    "us-east-2",
+    "us-west-1"
+    ]
+
+  key_ids = {
+    us-east-1 = "alias/rkms-us-east-1",
+    us-east-2 = "alias/rkms-us-east-2",
+    us-west-1 = "alias/rkms-us-west-1" }
 
 [dynamodb]
-region = "us-east-1"
-table_name = "kms_keys"
+  region = "us-east-1"
+  table_name = "rkms_keys"

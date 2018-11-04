@@ -13,19 +13,14 @@ const MinimumKMSRegions = 3
 
 // RKMS - Implementation of redundant KMS logic
 type RKMS struct {
-	regions []string //TODO: is this needed?
-	store   Store
+	regions []string
+	keyIds  map[string]*string
 	clients map[string]*kms.KMS
+	store   Store
 }
 
 // NewRKMSWithDynamoDB creates a new RKMS instance with DynamoDB used as its key/value store
 func NewRKMSWithDynamoDB(kmsConfig KMSConfig, dynamoDBConfig DynamoDBConfig) (*RKMS, error) {
-	if len(kmsConfig.Regions) < MinimumKMSRegions {
-		err := fmt.Errorf("a minimmum of %d KMS regions is required", MinimumKMSRegions)
-		log.Print(err)
-		return nil, err
-	}
-
 	store, err := NewDynamoDBStore(dynamoDBConfig)
 	if err != nil {
 		log.Print(err)
@@ -38,7 +33,7 @@ func NewRKMSWithDynamoDB(kmsConfig KMSConfig, dynamoDBConfig DynamoDBConfig) (*R
 		return nil, err
 	}
 
-	return &RKMS{kmsConfig.Regions, store, clients}, nil
+	return &RKMS{kmsConfig.Regions, kmsConfig.KeyIds, clients, store}, nil
 }
 
 func getKMSClientsForRegions(regions []string) (map[string]*kms.KMS, error) {
@@ -78,6 +73,7 @@ func (r *RKMS) GetKey(id string) (*string, error) {
 
 	if value != nil { //a data key already exist for the given id
 		//TODO: make parallelism configurable (e.g. request all KMS regions at the same time for the decrypted data key)
+		//TODO: *** make this for loop on top of Regions to preserve the order
 		for region, client := range r.clients {
 			result, err := client.Decrypt(&kms.DecryptInput{
 				CiphertextBlob: []byte(value[region]),
