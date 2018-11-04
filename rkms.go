@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -11,6 +12,10 @@ import (
 
 // MinimumKMSRegions is the minimum number of KMS regions needed to run a RKMS service
 const MinimumKMSRegions = 3
+
+// DataKeySizeInBytes is the length of the data encryption key in bytes
+//TODO: make this configurable
+const DataKeySizeInBytes int64 = 32
 
 // RKMS - Implementation of redundant KMS logic
 type RKMS struct {
@@ -88,13 +93,68 @@ func (r *RKMS) GetKey(id string) (*string, error) {
 			dataKey := string(result.Plaintext)
 			return &dataKey, nil
 		}
+
+		return nil, fmt.Errorf("failed to decrypt data key in every region")
 	}
 
-	//need to create the data key
-	//encrypt the data key in every region
-	//save in dynamoDB
-	//return the data key
+	//create the data key
+	firstRegion, plaintextDataKey, firstRegionCiphertext, err := r.createDataKey()
+	if err != nil {
+		logger.Errorf("failed to create a data key: %s", err)
+		return nil, err
+	}
 
-	res := fmt.Sprintf("%+v\n", value)
-	return &res, nil
+	var encryptedDataKeys = make(map[string]string)
+	encryptedDataKeys[*firstRegion] = *firstRegionCiphertext
+
+	//encrypt the data key in every region
+	for _, region := range r.regions {
+		if strings.Compare(region, *firstRegion) == 0 { //we have already encrypted in this region and have the ciphertext
+			continue
+		}
+
+		ciphertext, err := r.encryptDataKey(plaintextDataKey, &region)
+		if err != nil {
+			logger.Errorf("failed to encrypt data key in %s region: %s", region, err)
+			return nil, err
+		}
+
+		encryptedDataKeys[region] = *ciphertext
+	}
+
+	//save in dynamoDB
+	err = r.store.SetValue(id, encryptedDataKeys)
+	if err != nil {
+		logger.Errorf("failed to save encrypted data keys in key/value store: %s", err)
+		return nil, err
+	}
+
+	//return the data key
+	return plaintextDataKey, nil
+}
+
+func (r *RKMS) createDataKey() (*string, *string, *string, error) {
+	for _, region := range r.regions {
+		client := r.clients[region]
+		result, err := client.GenerateDataKey(&kms.GenerateDataKeyInput{
+			KeyId:         r.keyIds[region],
+			NumberOfBytes: aws.Int64(DataKeySizeInBytes),
+		})
+
+		if err != nil { //failed to create data key in this region
+			logger.Print(err)
+			continue
+		}
+
+		plaintext := string(result.Plaintext)
+		ciphertext := string(result.CiphertextBlob)
+		return &region, &plaintext, &ciphertext, nil
+	}
+
+	return nil, nil, nil, fmt.Errorf("failed to create a data key in every region")
+}
+
+func (r *RKMS) encryptDataKey(dataKey *string, region *string) (*string, error) {
+	//TODO:
+	return nil, nil
 }
