@@ -35,8 +35,8 @@ func NewDynamoDBStore(dynamoDBConfig DynamoDBConfig) (*DynamoDBStore, error) {
 	return &DynamoDBStore{dynamoDBConfig.Region, aws.String(dynamoDBConfig.TableName), client}, nil
 }
 
-// GetValue retrieves the value for the given key
-func (s *DynamoDBStore) GetValue(id string) (map[string]string, error) {
+// GetEncryptedDataKeys retrieves the encrypted data keys for the given id
+func (s *DynamoDBStore) GetEncryptedDataKeys(id string) (map[string]string, error) {
 	result, err := s.client.GetItem(&dynamodb.GetItemInput{
 		TableName: s.tableName,
 		Key: map[string]*dynamodb.AttributeValue{
@@ -66,8 +66,8 @@ func (s *DynamoDBStore) GetValue(id string) (map[string]string, error) {
 	return item.Keys, nil
 }
 
-// SetValue sets the value for the given key
-func (s *DynamoDBStore) SetValue(id string, encryptedKeysMap map[string]string) error {
+// SetEncryptedDataKeys sets the encrypted data keys for the given id
+func (s *DynamoDBStore) SetEncryptedDataKeys(id string, encryptedKeysMap map[string]string) error {
 	item := item{ID: id, Keys: encryptedKeysMap}
 	marshalledItem, err := dynamodbattribute.MarshalMap(item)
 	input := &dynamodb.PutItemInput{

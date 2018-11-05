@@ -72,18 +72,18 @@ func getKMSClientForRegion(region string) (*kms.KMS, error) {
 // GetKey retrieves the key assosicated with the given id.
 // If a key is not found in the store, a key is generated for the given id.
 func (r *RKMS) GetKey(id string) (*string, error) {
-	value, err := r.store.GetValue(id)
+	encryptedDataKeys, err := r.store.GetEncryptedDataKeys(id)
 	if err != nil {
 		logger.Print(err)
 		return nil, err
 	}
 
-	if value != nil { //a data key already exist for the given id
+	if encryptedDataKeys != nil { //a data key already exist for the given id
 		//TODO: make parallelism configurable (e.g. request all KMS regions at the same time for the decrypted data key)
 		for _, region := range r.regions {
 			client := r.clients[region]
 
-			ciphertext, err := base64.StdEncoding.DecodeString(value[region])
+			ciphertext, err := base64.StdEncoding.DecodeString(encryptedDataKeys[region])
 			if err != nil {
 				//TODO(enhancement): ciphertext value in database is corrupted. fix it asyncrounously
 				logger.Print(err)
@@ -113,7 +113,7 @@ func (r *RKMS) GetKey(id string) (*string, error) {
 		return nil, err
 	}
 
-	var encryptedDataKeys = make(map[string]string)
+	encryptedDataKeys = make(map[string]string)
 	encryptedDataKeys[*firstRegion] = *firstRegionCiphertext
 
 	//encrypt the data key in every region
@@ -133,7 +133,7 @@ func (r *RKMS) GetKey(id string) (*string, error) {
 	}
 
 	//save in dynamoDB
-	err = r.store.SetValue(id, encryptedDataKeys)
+	err = r.store.SetEncryptedDataKeys(id, encryptedDataKeys)
 	if err != nil {
 		logger.Errorf("failed to save encrypted data keys in key/value store: %s", err)
 		return nil, err
