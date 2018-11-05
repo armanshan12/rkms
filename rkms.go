@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"fmt"
 	"strings"
 
@@ -81,8 +82,16 @@ func (r *RKMS) GetKey(id string) (*string, error) {
 		//TODO: make parallelism configurable (e.g. request all KMS regions at the same time for the decrypted data key)
 		for _, region := range r.regions {
 			client := r.clients[region]
+
+			ciphertext, err := base64.StdEncoding.DecodeString(value[region])
+			if err != nil {
+				//TODO(enhancement): ciphertext value in database is corrupted. fix it asyncrounously
+				logger.Print(err)
+				continue
+			}
+
 			result, err := client.Decrypt(&kms.DecryptInput{
-				CiphertextBlob: []byte(value[region]),
+				CiphertextBlob: ciphertext,
 			})
 
 			if err != nil { //failed to decrypt in this region
@@ -90,7 +99,7 @@ func (r *RKMS) GetKey(id string) (*string, error) {
 				continue
 			}
 
-			dataKey := string(result.Plaintext)
+			dataKey := base64.StdEncoding.EncodeToString(result.Plaintext)
 			return &dataKey, nil
 		}
 
@@ -147,8 +156,8 @@ func (r *RKMS) createDataKey() (*string, *string, *string, error) {
 			continue
 		}
 
-		plaintext := string(result.Plaintext)
-		ciphertext := string(result.CiphertextBlob)
+		plaintext := base64.StdEncoding.EncodeToString(result.Plaintext)
+		ciphertext := base64.StdEncoding.EncodeToString(result.CiphertextBlob)
 		return &region, &plaintext, &ciphertext, nil
 	}
 
@@ -167,6 +176,6 @@ func (r *RKMS) encryptDataKey(dataKey *string, region *string) (*string, error) 
 		return nil, err
 	}
 
-	ciphertext := string(result.CiphertextBlob)
+	ciphertext := base64.StdEncoding.EncodeToString(result.CiphertextBlob)
 	return &ciphertext, nil
 }
