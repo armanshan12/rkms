@@ -69,54 +69,64 @@ func getKMSClientForRegion(region string) (*kms.KMS, error) {
 	return kms.New(sess), nil
 }
 
-// GetKey retrieves the key assosicated with the given id.
+// GetPlaintextDataKey retrieves the key assosicated with the given id.
 // If a key is not found in the store, a key is generated for the given id.
-func (r *RKMS) GetKey(id string) (*string, error) {
-	encryptedDataKeys, err := r.store.GetEncryptedDataKeys(id)
+func (r *RKMS) GetPlaintextDataKey(id string) (*string, error) {
+	plaintextDataKey, err := r.lookInStoreForDataKey(id)
 	if err != nil {
-		logger.Print(err)
+		logger.Error(err)
 		return nil, err
 	}
 
-	if encryptedDataKeys != nil { //a data key already exist for the given id
-		//TODO: make parallelism configurable (e.g. request all KMS regions at the same time for the decrypted data key)
-		for _, region := range r.regions {
-			client := r.clients[region]
-
-			ciphertext, err := base64.StdEncoding.DecodeString(encryptedDataKeys[region])
-			if err != nil {
-				//TODO(enhancement): ciphertext value in database is corrupted. fix it asyncrounously
-				logger.Print(err)
-				continue
-			}
-
-			result, err := client.Decrypt(&kms.DecryptInput{
-				CiphertextBlob: ciphertext,
-			})
-
-			if err != nil { //failed to decrypt in this region
-				logger.Print(err)
-				continue
-			}
-
-			dataKey := base64.StdEncoding.EncodeToString(result.Plaintext)
-			return &dataKey, nil
-		}
-
-		return nil, fmt.Errorf("failed to decrypt data key in every region")
+	if plaintextDataKey != nil {
+		logger.Debugln("a data key was found in the store for the given id")
+		return plaintextDataKey, nil
 	}
 
-	//create the data key
+	plaintextDataKey, err = r.createDataKeyForID(id)
+	if err != nil {
+		logger.Error(err)
+		return nil, err
+	}
+
+	//return the data key
+	return plaintextDataKey, nil
+}
+
+func (r *RKMS) lookInStoreForDataKey(id string) (*string, error) {
+	encryptedDataKeys, err := r.store.GetEncryptedDataKeys(id)
+	if err != nil {
+		logger.Error(err)
+		return nil, err
+	}
+
+	if encryptedDataKeys == nil {
+		logger.Debugln("no data key exists in the store for the given id")
+		return nil, nil
+	}
+
+	plaintextDataKey, err := r.decryptDataKey(encryptedDataKeys)
+	if err != nil {
+		err := fmt.Errorf("failed to decrypt data key in every region: %s", err)
+		logger.Error(err)
+		return nil, err
+	}
+
+	return plaintextDataKey, err
+}
+
+func (r *RKMS) createDataKeyForID(id string) (*string, error) {
+	logger.Debugln("creating data key...")
 	firstRegion, plaintextDataKey, firstRegionCiphertext, err := r.createDataKey()
 	if err != nil {
 		logger.Errorf("failed to create a data key: %s", err)
 		return nil, err
 	}
 
-	encryptedDataKeys = make(map[string]string)
+	encryptedDataKeys := make(map[string]string)
 	encryptedDataKeys[*firstRegion] = *firstRegionCiphertext
 
-	//encrypt the data key in every region
+	logger.Debugln("encrypting generated data key in every region...")
 	for _, region := range r.regions {
 		if strings.Compare(region, *firstRegion) == 0 { //we have already encrypted in this region and have the ciphertext
 			continue
@@ -132,14 +142,14 @@ func (r *RKMS) GetKey(id string) (*string, error) {
 		encryptedDataKeys[region] = *ciphertext
 	}
 
-	//save in dynamoDB
+	logger.Debugln("saving encrypted data keys in store...")
 	err = r.store.SetEncryptedDataKeys(id, encryptedDataKeys)
 	if err != nil {
 		logger.Errorf("failed to save encrypted data keys in key/value store: %s", err)
 		return nil, err
 	}
 
-	//return the data key
+	logger.Debugln("done creating and saving encrypted data keys")
 	return plaintextDataKey, nil
 }
 
@@ -165,10 +175,16 @@ func (r *RKMS) createDataKey() (*string, *string, *string, error) {
 }
 
 func (r *RKMS) encryptDataKey(dataKey *string, region *string) (*string, error) {
+	plaintext, err := base64.StdEncoding.DecodeString(*dataKey)
+	if err != nil {
+		logger.Error(err)
+		return nil, err
+	}
+
 	client := r.clients[*region]
 	result, err := client.Encrypt(&kms.EncryptInput{
 		KeyId:     r.keyIds[*region],
-		Plaintext: []byte(*dataKey),
+		Plaintext: plaintext,
 	})
 
 	if err != nil { //failed to create data key in this region
@@ -178,4 +194,36 @@ func (r *RKMS) encryptDataKey(dataKey *string, region *string) (*string, error) 
 
 	ciphertext := base64.StdEncoding.EncodeToString(result.CiphertextBlob)
 	return &ciphertext, nil
+}
+
+func (r *RKMS) decryptDataKey(encryptedDataKeys map[string]string) (*string, error) {
+	var lastError error
+
+	//TODO: make parallelism configurable (e.g. request all KMS regions at the same time for the decrypted data key)
+	for _, region := range r.regions {
+		client := r.clients[region]
+
+		ciphertext, err := base64.StdEncoding.DecodeString(encryptedDataKeys[region])
+		if err != nil {
+			//TODO(enhancement): ciphertext value in database is corrupted. fix it asyncrounously
+			logger.Print(err)
+			lastError = err
+			continue
+		}
+
+		result, err := client.Decrypt(&kms.DecryptInput{
+			CiphertextBlob: ciphertext,
+		})
+
+		if err != nil { //failed to decrypt in this region
+			logger.Print(err)
+			lastError = err
+			continue
+		}
+
+		dataKey := base64.StdEncoding.EncodeToString(result.Plaintext)
+		return &dataKey, nil
+	}
+
+	return nil, lastError
 }

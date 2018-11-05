@@ -10,6 +10,9 @@ var config = LoadConfiguration()
 var rkmsHandler *RKMS
 
 func main() {
+	//TODO: make this configurable
+	logger.SetLevel(logger.DebugLevel)
+
 	rkms, err := NewRKMSWithDynamoDB(config.KMS, config.DynamoDB)
 	if err != nil {
 		logger.Fatal(err)
@@ -34,7 +37,7 @@ func getKey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	key, err := rkmsHandler.GetKey(id)
+	key, err := rkmsHandler.GetPlaintextDataKey(id)
 	if err != nil {
 		//TODO: do a better error handling based on the type of error
 		b := ConstructErrorResponse("InternalError", err.Error())
