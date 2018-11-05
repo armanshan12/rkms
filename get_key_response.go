@@ -5,12 +5,13 @@ import (
 )
 
 type getKeyResponse struct {
+	ID  *string `json:"id"`
 	Key *string `json:"key"`
 }
 
 // ConstructGetKeyResponse creates a server response for GET /key endpoint
-func ConstructGetKeyResponse(key *string) []byte {
-	resp := getKeyResponse{key}
+func ConstructGetKeyResponse(id *string, key *string) []byte {
+	resp := getKeyResponse{id, key}
 	b, _ := json.Marshal(resp)
 	return b
 }
