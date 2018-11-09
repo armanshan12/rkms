@@ -8,6 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/kms"
+	"github.com/aws/aws-sdk-go/service/kms/kmsiface"
 	logger "github.com/sirupsen/logrus"
 )
 
@@ -22,7 +23,7 @@ const DataKeySizeInBytes int64 = 32
 type RKMS struct {
 	regions []string
 	keyIds  map[string]*string
-	clients map[string]*kms.KMS
+	clients map[string]kmsiface.KMSAPI
 	store   Store
 }
 
@@ -30,21 +31,21 @@ type RKMS struct {
 func NewRKMSWithDynamoDB(kmsConfig KMSConfig, dynamoDBConfig DynamoDBConfig) (*RKMS, error) {
 	store, err := NewDynamoDBStore(dynamoDBConfig)
 	if err != nil {
-		logger.Print(err)
+		logger.Error(err)
 		return nil, err
 	}
 
 	clients, err := getKMSClientsForRegions(kmsConfig.Regions)
 	if err != nil {
-		logger.Print(err)
+		logger.Error(err)
 		return nil, err
 	}
 
 	return &RKMS{kmsConfig.Regions, kmsConfig.KeyIds, clients, store}, nil
 }
 
-func getKMSClientsForRegions(regions []string) (map[string]*kms.KMS, error) {
-	clients := make(map[string]*kms.KMS)
+func getKMSClientsForRegions(regions []string) (map[string]kmsiface.KMSAPI, error) {
+	clients := make(map[string]kmsiface.KMSAPI)
 
 	for _, region := range regions {
 		client, err := getKMSClientForRegion(region)
@@ -57,7 +58,7 @@ func getKMSClientsForRegions(regions []string) (map[string]*kms.KMS, error) {
 	return clients, nil
 }
 
-func getKMSClientForRegion(region string) (*kms.KMS, error) {
+func getKMSClientForRegion(region string) (kmsiface.KMSAPI, error) {
 	sess, err := session.NewSession(&aws.Config{
 		Region: aws.String(region),
 	})
@@ -162,7 +163,7 @@ func (r *RKMS) createDataKey() (*string, *string, *string, error) {
 		})
 
 		if err != nil { //failed to create data key in this region
-			logger.Print(err)
+			logger.Error(err)
 			continue
 		}
 
@@ -188,7 +189,7 @@ func (r *RKMS) encryptDataKey(dataKey *string, region *string) (*string, error) 
 	})
 
 	if err != nil { //failed to create data key in this region
-		logger.Print(err)
+		logger.Error(err)
 		return nil, err
 	}
 
@@ -206,7 +207,7 @@ func (r *RKMS) decryptDataKey(encryptedDataKeys map[string]string) (*string, err
 		ciphertext, err := base64.StdEncoding.DecodeString(encryptedDataKeys[region])
 		if err != nil {
 			//TODO(enhancement): ciphertext value in database is corrupted. fix it asyncrounously
-			logger.Print(err)
+			logger.Error(err)
 			lastError = err
 			continue
 		}
@@ -216,7 +217,7 @@ func (r *RKMS) decryptDataKey(encryptedDataKeys map[string]string) (*string, err
 		})
 
 		if err != nil { //failed to decrypt in this region
-			logger.Print(err)
+			logger.Error(err)
 			lastError = err
 			continue
 		}

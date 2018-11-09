@@ -6,13 +6,13 @@ import (
 	logger "github.com/sirupsen/logrus"
 )
 
-var config = LoadConfiguration()
 var rkmsHandler *RKMS
 
 func main() {
 	//TODO: make this configurable
 	logger.SetLevel(logger.DebugLevel)
 
+	config := LoadConfiguration()
 	rkms, err := NewRKMSWithDynamoDB(config.KMS, config.DynamoDB)
 	if err != nil {
 		logger.Fatal(err)
