@@ -19,7 +19,7 @@ const MinimumKMSRegions = 3
 //TODO: make this configurable
 const DataKeySizeInBytes int64 = 32
 
-// RKMS - Implementation of redundant KMS logic
+// RKMS - Implementation of reliable KMS logic
 type RKMS struct {
 	regions []string
 	keyIds  map[string]*string
