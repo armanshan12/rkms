@@ -13,6 +13,11 @@ type ServerConfig struct {
 	APIVersion string `mapstructure:"api_version"`
 }
 
+// LoggerConfig represents the configuration needed for logging
+type LoggerConfig struct {
+	Level string
+}
+
 // KMSConfig contains information for KMS services
 type KMSConfig struct {
 	Regions            []string
@@ -29,6 +34,7 @@ type DynamoDBConfig struct {
 // Configuration represents all the configuration information this application needss
 type Configuration struct {
 	Server   ServerConfig
+	Logger   LoggerConfig
 	KMS      KMSConfig
 	DynamoDB DynamoDBConfig
 }

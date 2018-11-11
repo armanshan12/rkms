@@ -2,6 +2,9 @@
   port = "8080"
   api_version = "v1"
 
+[logger]
+  level = "debug"
+
 [kms]
   regions = [
     "us-east-1",

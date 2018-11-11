@@ -9,10 +9,14 @@ import (
 var rkmsHandler *RKMS
 
 func main() {
-	//TODO: make this configurable
-	logger.SetLevel(logger.DebugLevel)
-
 	config := LoadConfiguration()
+
+	level, err := logger.ParseLevel(config.Logger.Level)
+	if err != nil {
+		logger.Fatal(err)
+	}
+	logger.SetLevel(level)
+
 	rkms, err := NewRKMSWithDynamoDB(config.KMS, config.DynamoDB)
 	if err != nil {
 		logger.Fatal(err)
