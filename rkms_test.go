@@ -78,8 +78,9 @@ func (c *availableKMSClient) Decrypt(input *kms.DecryptInput) (*kms.DecryptOutpu
 
 type mockStore struct {
 	Store
-	dataShouldExist bool
-	numberOfRegions int
+	numberOfRegions                     int
+	dataShouldExist                     bool
+	numberOfTimesToFailSetConditionally int
 }
 
 func (s *mockStore) GetEncryptedDataKeys(id string) (map[string]string, error) {
@@ -97,15 +98,24 @@ func (s *mockStore) GetEncryptedDataKeys(id string) (map[string]string, error) {
 	return keys, nil
 }
 
-func (s *mockStore) SetEncryptedDataKeys(id string, keys map[string]string) error {
+func (s *mockStore) SetEncryptedDataKeysConditionally(id string, keys map[string]string) error {
 	counters[mockStoreSetEncryptionDataKeysCallCount] = counters[mockStoreSetEncryptionDataKeysCallCount] + 1
+
+	if s.numberOfTimesToFailSetConditionally > 0 {
+		s.numberOfTimesToFailSetConditionally--
+		if s.numberOfTimesToFailSetConditionally == 0 {
+			s.dataShouldExist = true
+		}
+		return IDAlreadyExistsStoreError{ID: id}
+	}
+
 	return nil
 }
 
 // getRKMS returns an RKMS object with mock KMS clients.
 // The clients will be avialable if the value for their index is set to true.
 // Otherwise, the mock client will fail on every call.
-func getRKMS(regionsAvailable []bool, dataShouldExistInStore bool) *RKMS {
+func getRKMS(regionsAvailable []bool) *RKMS {
 	regions := make([]string, len(regionsAvailable))
 	keyIds := make(map[string]*string)
 	clients := make(map[string]kmsiface.KMSAPI)
@@ -125,7 +135,6 @@ func getRKMS(regionsAvailable []bool, dataShouldExistInStore bool) *RKMS {
 	}
 
 	store := new(mockStore)
-	store.dataShouldExist = dataShouldExistInStore
 	store.numberOfRegions = len(regionsAvailable)
 	return &RKMS{regions, keyIds, clients, store, int64(32)}
 }
@@ -157,15 +166,17 @@ func TestServersUpEmptyStore(t *testing.T) {
 	beforeTest()
 
 	regionsAvailable := []bool{true, true, true}
-	dataShouldExistInStore := false
-	r := getRKMS(regionsAvailable, dataShouldExistInStore)
+	r := getRKMS(regionsAvailable)
+	if mockStore, ok := r.store.(*mockStore); ok {
+		mockStore.dataShouldExist = false
+	}
 
-	base64PlainText, err := r.GetPlaintextDataKey("id")
+	base64Plaintext, err := r.GetPlaintextDataKey("id")
 	if err != nil {
 		t.Fatalf("was not able to get plaintext: %s", err)
 	}
 
-	plaintext, err := base64.StdEncoding.DecodeString(*base64PlainText)
+	plaintext, err := base64.StdEncoding.DecodeString(*base64Plaintext)
 	if err != nil {
 		t.Fatalf("failed to decode base64 plaintext: %s", err)
 	}
@@ -193,15 +204,17 @@ func TestServersUpFilledStore(t *testing.T) {
 	beforeTest()
 
 	regionsAvailable := []bool{true, true, true}
-	dataShouldExistInStore := true
-	r := getRKMS(regionsAvailable, dataShouldExistInStore)
+	r := getRKMS(regionsAvailable)
+	if mockStore, ok := r.store.(*mockStore); ok {
+		mockStore.dataShouldExist = true
+	}
 
-	base64PlainText, err := r.GetPlaintextDataKey("id")
+	base64Plaintext, err := r.GetPlaintextDataKey("id")
 	if err != nil {
 		t.Fatalf("was not able to get plaintext: %s", err)
 	}
 
-	plaintext, err := base64.StdEncoding.DecodeString(*base64PlainText)
+	plaintext, err := base64.StdEncoding.DecodeString(*base64Plaintext)
 	if err != nil {
 		t.Fatalf("failed to decode base64 plaintext: %s", err)
 	}
@@ -229,8 +242,10 @@ func TestFirstServerDownEmptyStore(t *testing.T) {
 	beforeTest()
 
 	regionsAvailable := []bool{false, true, true}
-	dataShouldExistInStore := false
-	r := getRKMS(regionsAvailable, dataShouldExistInStore)
+	r := getRKMS(regionsAvailable)
+	if mockStore, ok := r.store.(*mockStore); ok {
+		mockStore.dataShouldExist = false
+	}
 
 	_, err := r.GetPlaintextDataKey("id")
 	if err == nil {
@@ -256,15 +271,17 @@ func TestFirstServerDownFilledStore(t *testing.T) {
 	beforeTest()
 
 	regionsAvailable := []bool{false, true, true}
-	dataShouldExistInStore := true
-	r := getRKMS(regionsAvailable, dataShouldExistInStore)
+	r := getRKMS(regionsAvailable)
+	if mockStore, ok := r.store.(*mockStore); ok {
+		mockStore.dataShouldExist = true
+	}
 
-	base64PlainText, err := r.GetPlaintextDataKey("id")
+	base64Plaintext, err := r.GetPlaintextDataKey("id")
 	if err != nil {
 		t.Fatalf("was not able to get plaintext: %s", err)
 	}
 
-	plaintext, err := base64.StdEncoding.DecodeString(*base64PlainText)
+	plaintext, err := base64.StdEncoding.DecodeString(*base64Plaintext)
 	if err != nil {
 		t.Fatalf("failed to decode base64 plaintext: %s", err)
 	}
@@ -292,8 +309,10 @@ func TestFirstTwoServersDownEmptyStore(t *testing.T) {
 	beforeTest()
 
 	regionsAvailable := []bool{false, false, true}
-	dataShouldExistInStore := false
-	r := getRKMS(regionsAvailable, dataShouldExistInStore)
+	r := getRKMS(regionsAvailable)
+	if mockStore, ok := r.store.(*mockStore); ok {
+		mockStore.dataShouldExist = false
+	}
 
 	_, err := r.GetPlaintextDataKey("id")
 	if err == nil {
@@ -319,15 +338,17 @@ func TestFirstTwoServersDownFilledStore(t *testing.T) {
 	beforeTest()
 
 	regionsAvailable := []bool{false, false, true}
-	dataShouldExistInStore := true
-	r := getRKMS(regionsAvailable, dataShouldExistInStore)
+	r := getRKMS(regionsAvailable)
+	if mockStore, ok := r.store.(*mockStore); ok {
+		mockStore.dataShouldExist = true
+	}
 
-	base64PlainText, err := r.GetPlaintextDataKey("id")
+	base64Plaintext, err := r.GetPlaintextDataKey("id")
 	if err != nil {
 		t.Fatalf("was not able to get plaintext: %s", err)
 	}
 
-	plaintext, err := base64.StdEncoding.DecodeString(*base64PlainText)
+	plaintext, err := base64.StdEncoding.DecodeString(*base64Plaintext)
 	if err != nil {
 		t.Fatalf("failed to decode base64 plaintext: %s", err)
 	}
@@ -355,8 +376,10 @@ func TestAllServersDownEmptyStore(t *testing.T) {
 	beforeTest()
 
 	regionsAvailable := []bool{false, false, false}
-	dataShouldExistInStore := false
-	r := getRKMS(regionsAvailable, dataShouldExistInStore)
+	r := getRKMS(regionsAvailable)
+	if mockStore, ok := r.store.(*mockStore); ok {
+		mockStore.dataShouldExist = false
+	}
 
 	_, err := r.GetPlaintextDataKey("id")
 	if err == nil {
@@ -382,8 +405,10 @@ func TestAllServersDownFilledStore(t *testing.T) {
 	beforeTest()
 
 	regionsAvailable := []bool{false, false, false}
-	dataShouldExistInStore := true
-	r := getRKMS(regionsAvailable, dataShouldExistInStore)
+	r := getRKMS(regionsAvailable)
+	if mockStore, ok := r.store.(*mockStore); ok {
+		mockStore.dataShouldExist = true
+	}
 
 	_, err := r.GetPlaintextDataKey("id")
 	if err == nil {
@@ -401,6 +426,102 @@ func TestAllServersDownFilledStore(t *testing.T) {
 
 	expectedCountersValues[mockStoreGetEncryptedDataKeysCallCount] = 1
 	expectedCountersValues[mockStoreSetEncryptionDataKeysCallCount] = 0
+
+	verifyCounters(t, counters, expectedCountersValues)
+}
+
+func TestConditionalWriteToStore(t *testing.T) {
+	beforeTest()
+
+	regionsAvailable := []bool{true, true, true}
+	r := getRKMS(regionsAvailable)
+	if mockStore, ok := r.store.(*mockStore); ok {
+		mockStore.dataShouldExist = false
+		mockStore.numberOfTimesToFailSetConditionally = 1
+	}
+
+	base64Plaintext, err := r.GetPlaintextDataKey("id")
+	if err != nil {
+		t.Fatalf("was not able to get plaintext: %s", err)
+	}
+
+	plaintext, err := base64.StdEncoding.DecodeString(*base64Plaintext)
+	if err != nil {
+		t.Fatalf("failed to decode base64 plaintext: %s", err)
+	}
+
+	if strings.Compare(string(plaintext), "plaintext") != 0 {
+		t.Fatalf("returned plaintext data key is wrong: %s", plaintext)
+	}
+
+	expectedCountersValues := make(map[string]int)
+	expectedCountersValues[availableKMSGenerateDataKeyCallCount] = 1
+	expectedCountersValues[availableKMSEncryptCallCount] = 2
+	expectedCountersValues[availableKMSDecryptCallCount] = 1
+
+	expectedCountersValues[mockStoreGetEncryptedDataKeysCallCount] = 2
+	expectedCountersValues[mockStoreSetEncryptionDataKeysCallCount] = 1
+
+	verifyCounters(t, counters, expectedCountersValues)
+}
+
+func TestGetPLaintextDataKeyRetrySuccess(t *testing.T) {
+	beforeTest()
+
+	regionsAvailable := []bool{true, true, true}
+	r := getRKMS(regionsAvailable)
+	if mockStore, ok := r.store.(*mockStore); ok {
+		mockStore.dataShouldExist = false
+		mockStore.numberOfTimesToFailSetConditionally = MaxNumberOfGetPlaintextDataKeyTries - 1
+	}
+
+	base64Plaintext, err := r.GetPlaintextDataKey("id")
+	if err != nil {
+		t.Fatalf("was not able to get plaintext: %s", err)
+	}
+
+	plaintext, err := base64.StdEncoding.DecodeString(*base64Plaintext)
+	if err != nil {
+		t.Fatalf("failed to decode base64 plaintext: %s", err)
+	}
+
+	if strings.Compare(string(plaintext), "plaintext") != 0 {
+		t.Fatalf("returned plaintext data key is wrong: %s", plaintext)
+	}
+
+	expectedCountersValues := make(map[string]int)
+	expectedCountersValues[availableKMSGenerateDataKeyCallCount] = 2
+	expectedCountersValues[availableKMSEncryptCallCount] = 4
+	expectedCountersValues[availableKMSDecryptCallCount] = 1
+
+	expectedCountersValues[mockStoreGetEncryptedDataKeysCallCount] = 3
+	expectedCountersValues[mockStoreSetEncryptionDataKeysCallCount] = 2
+
+	verifyCounters(t, counters, expectedCountersValues)
+}
+
+func TestGetPLaintextDataKeyRetryFail(t *testing.T) {
+	beforeTest()
+
+	regionsAvailable := []bool{true, true, true}
+	r := getRKMS(regionsAvailable)
+	if mockStore, ok := r.store.(*mockStore); ok {
+		mockStore.dataShouldExist = false
+		mockStore.numberOfTimesToFailSetConditionally = MaxNumberOfGetPlaintextDataKeyTries
+	}
+
+	_, err := r.GetPlaintextDataKey("id")
+	if err == nil {
+		t.Fatalf("should not have received a data key back")
+	}
+
+	expectedCountersValues := make(map[string]int)
+	expectedCountersValues[availableKMSGenerateDataKeyCallCount] = 3
+	expectedCountersValues[availableKMSEncryptCallCount] = 6
+	expectedCountersValues[availableKMSDecryptCallCount] = 0
+
+	expectedCountersValues[mockStoreGetEncryptedDataKeysCallCount] = 3
+	expectedCountersValues[mockStoreSetEncryptionDataKeysCallCount] = 3
 
 	verifyCounters(t, counters, expectedCountersValues)
 }
