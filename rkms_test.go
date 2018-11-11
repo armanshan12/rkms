@@ -97,7 +97,7 @@ func (s *mockStore) GetEncryptedDataKeys(id string) (map[string]string, error) {
 	return keys, nil
 }
 
-func (s *mockStore) SetEncryptedDataKeys(id string, keys map[string]string) error {
+func (s *mockStore) SetEncryptedDataKeysConditionally(id string, keys map[string]string) error {
 	counters[mockStoreSetEncryptionDataKeysCallCount] = counters[mockStoreSetEncryptionDataKeysCallCount] + 1
 	return nil
 }
