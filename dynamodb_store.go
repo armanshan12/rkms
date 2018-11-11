@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
@@ -66,17 +67,29 @@ func (s *DynamoDBStore) GetEncryptedDataKeys(id string) (map[string]string, erro
 	return item.Keys, nil
 }
 
-// SetEncryptedDataKeys sets the encrypted data keys for the given id
-func (s *DynamoDBStore) SetEncryptedDataKeys(id string, encryptedKeysMap map[string]string) error {
+// SetEncryptedDataKeysConditionally sets the encrypted data keys for the given id
+// only if id does not exist in the store already.
+// If the id already exists, an error is returned.
+func (s *DynamoDBStore) SetEncryptedDataKeysConditionally(id string, encryptedKeysMap map[string]string) error {
 	item := item{ID: id, Keys: encryptedKeysMap}
 	marshalledItem, err := dynamodbattribute.MarshalMap(item)
+
+	conditionExpression := "attribute_not_exists(id)"
+
 	input := &dynamodb.PutItemInput{
-		Item:      marshalledItem,
-		TableName: s.tableName,
+		TableName:           s.tableName,
+		Item:                marshalledItem,
+		ConditionExpression: aws.String(conditionExpression),
 	}
 
 	_, err = s.client.PutItem(input)
 	if err != nil {
+		if awsErr, ok := err.(awserr.Error); ok {
+			if awsErr.Code() == dynamodb.ErrCodeConditionalCheckFailedException {
+				return IDAlreadyExistsStoreError{ID: id}
+			}
+		}
+
 		logger.Print(err)
 		return err
 	}

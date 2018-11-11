@@ -15,6 +15,9 @@ import (
 // MinimumKMSRegions is the minimum number of KMS regions needed to run a RKMS service
 const MinimumKMSRegions = 3
 
+// MaxNumberOfGetPlaintextDataKeyTries is the number of attempts to get/create data key before quitting
+const MaxNumberOfGetPlaintextDataKeyTries = 3
+
 // RKMS - Implementation of reliable KMS logic
 type RKMS struct {
 	regions []string
@@ -72,6 +75,14 @@ func getKMSClientForRegion(region string) (kmsiface.KMSAPI, error) {
 // GetPlaintextDataKey retrieves the key assosicated with the given id.
 // If a key is not found in the store, a key is generated for the given id.
 func (r *RKMS) GetPlaintextDataKey(id string) (*string, error) {
+	return r.getPlaintextDataKey(id, MaxNumberOfGetPlaintextDataKeyTries, nil)
+}
+
+func (r *RKMS) getPlaintextDataKey(id string, triesLeft int, lastErr error) (*string, error) {
+	if triesLeft == 0 {
+		return nil, lastErr
+	}
+
 	plaintextDataKey, err := r.lookInStoreForDataKey(id)
 	if err != nil {
 		logger.Error(err)
@@ -85,6 +96,11 @@ func (r *RKMS) GetPlaintextDataKey(id string) (*string, error) {
 
 	plaintextDataKey, err = r.createDataKeyForID(id)
 	if err != nil {
+		if _, ok := err.(IDAlreadyExistsStoreError); ok {
+			//retry the whole process which will retry fetching data from store
+			return r.getPlaintextDataKey(id, triesLeft-1, err)
+		}
+
 		logger.Error(err)
 		return nil, err
 	}
@@ -143,7 +159,7 @@ func (r *RKMS) createDataKeyForID(id string) (*string, error) {
 	}
 
 	logger.Debugln("saving encrypted data keys in store...")
-	err = r.store.SetEncryptedDataKeys(id, encryptedDataKeys)
+	err = r.store.SetEncryptedDataKeysConditionally(id, encryptedDataKeys)
 	if err != nil {
 		logger.Errorf("failed to save encrypted data keys in key/value store: %s", err)
 		return nil, err
