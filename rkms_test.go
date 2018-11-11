@@ -127,7 +127,7 @@ func getRKMS(regionsAvailable []bool, dataShouldExistInStore bool) *RKMS {
 	store := new(mockStore)
 	store.dataShouldExist = dataShouldExistInStore
 	store.numberOfRegions = len(regionsAvailable)
-	return &RKMS{regions, keyIds, clients, store}
+	return &RKMS{regions, keyIds, clients, store, int64(32)}
 }
 
 func getTestRegionName(regionIndex int) string {
