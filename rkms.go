@@ -206,8 +206,8 @@ func (r *RKMS) decryptDataKey(encryptedDataKeys map[string]string) (*string, err
 
 		ciphertext, err := base64.StdEncoding.DecodeString(encryptedDataKeys[region])
 		if err != nil {
-			//TODO(enhancement): ciphertext value in database is corrupted. fix it asyncrounously
-			logger.Error(err)
+			//TODO(enhancement): fix it asyncrounously
+			logger.Errorf("ciphertext value is corrupted in the store for %s region: %s", region, err)
 			lastError = err
 			continue
 		}
