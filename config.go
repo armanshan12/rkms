@@ -15,8 +15,9 @@ type ServerConfig struct {
 
 // KMSConfig contains information for KMS services
 type KMSConfig struct {
-	Regions []string
-	KeyIds  map[string]*string `mapstructure:"key_ids"`
+	Regions            []string
+	KeyIds             map[string]*string `mapstructure:"key_ids"`
+	DataKeySizeInBytes int64              `mapstructure:"data_key_size_in_bytes"`
 }
 
 // DynamoDBConfig contains information for DynamoDB used for RKMS

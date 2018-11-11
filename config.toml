@@ -13,6 +13,8 @@
     us-east-1 = "alias/rkms-us-east-1",
     us-east-2 = "alias/rkms-us-east-2",
     us-west-1 = "alias/rkms-us-west-1" }
+  
+  data_key_size_in_bytes = 32
 
 [dynamodb]
   region = "us-east-1"

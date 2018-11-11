@@ -15,16 +15,15 @@ import (
 // MinimumKMSRegions is the minimum number of KMS regions needed to run a RKMS service
 const MinimumKMSRegions = 3
 
-// DataKeySizeInBytes is the length of the data encryption key in bytes
-//TODO: make this configurable
-const DataKeySizeInBytes int64 = 32
-
 // RKMS - Implementation of reliable KMS logic
 type RKMS struct {
 	regions []string
 	keyIds  map[string]*string
 	clients map[string]kmsiface.KMSAPI
 	store   Store
+
+	// the length of the data encryption key in bytes
+	dataKeySizeInBytes int64
 }
 
 // NewRKMSWithDynamoDB creates a new RKMS instance with DynamoDB used as its key/value store
@@ -41,7 +40,7 @@ func NewRKMSWithDynamoDB(kmsConfig KMSConfig, dynamoDBConfig DynamoDBConfig) (*R
 		return nil, err
 	}
 
-	return &RKMS{kmsConfig.Regions, kmsConfig.KeyIds, clients, store}, nil
+	return &RKMS{kmsConfig.Regions, kmsConfig.KeyIds, clients, store, kmsConfig.DataKeySizeInBytes}, nil
 }
 
 func getKMSClientsForRegions(regions []string) (map[string]kmsiface.KMSAPI, error) {
@@ -159,7 +158,7 @@ func (r *RKMS) createDataKey() (*string, *string, *string, error) {
 		client := r.clients[region]
 		result, err := client.GenerateDataKey(&kms.GenerateDataKeyInput{
 			KeyId:         r.keyIds[region],
-			NumberOfBytes: aws.Int64(DataKeySizeInBytes),
+			NumberOfBytes: aws.Int64(r.dataKeySizeInBytes),
 		})
 
 		if err != nil { //failed to create data key in this region
