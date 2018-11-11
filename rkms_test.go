@@ -188,3 +188,219 @@ func TestServersUpEmptyStore(t *testing.T) {
 
 	verifyCounters(t, counters, expectedCountersValues)
 }
+
+func TestServersUpFilledStore(t *testing.T) {
+	beforeTest()
+
+	regionsAvailable := []bool{true, true, true}
+	dataShouldExistInStore := true
+	r := getRKMS(regionsAvailable, dataShouldExistInStore)
+
+	base64PlainText, err := r.GetPlaintextDataKey("id")
+	if err != nil {
+		t.Fatalf("was not able to get plaintext: %s", err)
+	}
+
+	plaintext, err := base64.StdEncoding.DecodeString(*base64PlainText)
+	if err != nil {
+		t.Fatalf("failed to decode base64 plaintext: %s", err)
+	}
+
+	if strings.Compare(string(plaintext), "plaintext") != 0 {
+		t.Fatalf("returned plaintext data key is wrong: %s", plaintext)
+	}
+
+	expectedCountersValues := make(map[string]int)
+	expectedCountersValues[unavailableKMSGenerateDataKeyCallCount] = 0
+	expectedCountersValues[unavailableKMSEncryptCallCount] = 0
+	expectedCountersValues[unavailableKMSDecryptCallCount] = 0
+
+	expectedCountersValues[availableKMSGenerateDataKeyCallCount] = 0
+	expectedCountersValues[availableKMSEncryptCallCount] = 0
+	expectedCountersValues[availableKMSDecryptCallCount] = 1
+
+	expectedCountersValues[mockStoreGetEncryptedDataKeysCallCount] = 1
+	expectedCountersValues[mockStoreSetEncryptionDataKeysCallCount] = 0
+
+	verifyCounters(t, counters, expectedCountersValues)
+}
+
+func TestFirstServerDownEmptyStore(t *testing.T) {
+	beforeTest()
+
+	regionsAvailable := []bool{false, true, true}
+	dataShouldExistInStore := false
+	r := getRKMS(regionsAvailable, dataShouldExistInStore)
+
+	_, err := r.GetPlaintextDataKey("id")
+	if err == nil {
+		t.Fatalf("should not have received a data key back")
+	}
+
+	expectedCountersValues := make(map[string]int)
+	expectedCountersValues[unavailableKMSGenerateDataKeyCallCount] = 1
+	expectedCountersValues[unavailableKMSEncryptCallCount] = 1
+	expectedCountersValues[unavailableKMSDecryptCallCount] = 0
+
+	expectedCountersValues[availableKMSGenerateDataKeyCallCount] = 1
+	expectedCountersValues[availableKMSEncryptCallCount] = 0
+	expectedCountersValues[availableKMSDecryptCallCount] = 0
+
+	expectedCountersValues[mockStoreGetEncryptedDataKeysCallCount] = 1
+	expectedCountersValues[mockStoreSetEncryptionDataKeysCallCount] = 0
+
+	verifyCounters(t, counters, expectedCountersValues)
+}
+
+func TestFirstServerDownFilledStore(t *testing.T) {
+	beforeTest()
+
+	regionsAvailable := []bool{false, true, true}
+	dataShouldExistInStore := true
+	r := getRKMS(regionsAvailable, dataShouldExistInStore)
+
+	base64PlainText, err := r.GetPlaintextDataKey("id")
+	if err != nil {
+		t.Fatalf("was not able to get plaintext: %s", err)
+	}
+
+	plaintext, err := base64.StdEncoding.DecodeString(*base64PlainText)
+	if err != nil {
+		t.Fatalf("failed to decode base64 plaintext: %s", err)
+	}
+
+	if strings.Compare(string(plaintext), "plaintext") != 0 {
+		t.Fatalf("returned plaintext data key is wrong: %s", plaintext)
+	}
+
+	expectedCountersValues := make(map[string]int)
+	expectedCountersValues[unavailableKMSGenerateDataKeyCallCount] = 0
+	expectedCountersValues[unavailableKMSEncryptCallCount] = 0
+	expectedCountersValues[unavailableKMSDecryptCallCount] = 1
+
+	expectedCountersValues[availableKMSGenerateDataKeyCallCount] = 0
+	expectedCountersValues[availableKMSEncryptCallCount] = 0
+	expectedCountersValues[availableKMSDecryptCallCount] = 1
+
+	expectedCountersValues[mockStoreGetEncryptedDataKeysCallCount] = 1
+	expectedCountersValues[mockStoreSetEncryptionDataKeysCallCount] = 0
+
+	verifyCounters(t, counters, expectedCountersValues)
+}
+
+func TestFirstTwoServersDownEmptyStore(t *testing.T) {
+	beforeTest()
+
+	regionsAvailable := []bool{false, false, true}
+	dataShouldExistInStore := false
+	r := getRKMS(regionsAvailable, dataShouldExistInStore)
+
+	_, err := r.GetPlaintextDataKey("id")
+	if err == nil {
+		t.Fatalf("should not have received a data key back")
+	}
+
+	expectedCountersValues := make(map[string]int)
+	expectedCountersValues[unavailableKMSGenerateDataKeyCallCount] = 2
+	expectedCountersValues[unavailableKMSEncryptCallCount] = 1
+	expectedCountersValues[unavailableKMSDecryptCallCount] = 0
+
+	expectedCountersValues[availableKMSGenerateDataKeyCallCount] = 1
+	expectedCountersValues[availableKMSEncryptCallCount] = 0
+	expectedCountersValues[availableKMSDecryptCallCount] = 0
+
+	expectedCountersValues[mockStoreGetEncryptedDataKeysCallCount] = 1
+	expectedCountersValues[mockStoreSetEncryptionDataKeysCallCount] = 0
+
+	verifyCounters(t, counters, expectedCountersValues)
+}
+
+func TestFirstTwoServersDownFilledStore(t *testing.T) {
+	beforeTest()
+
+	regionsAvailable := []bool{false, false, true}
+	dataShouldExistInStore := true
+	r := getRKMS(regionsAvailable, dataShouldExistInStore)
+
+	base64PlainText, err := r.GetPlaintextDataKey("id")
+	if err != nil {
+		t.Fatalf("was not able to get plaintext: %s", err)
+	}
+
+	plaintext, err := base64.StdEncoding.DecodeString(*base64PlainText)
+	if err != nil {
+		t.Fatalf("failed to decode base64 plaintext: %s", err)
+	}
+
+	if strings.Compare(string(plaintext), "plaintext") != 0 {
+		t.Fatalf("returned plaintext data key is wrong: %s", plaintext)
+	}
+
+	expectedCountersValues := make(map[string]int)
+	expectedCountersValues[unavailableKMSGenerateDataKeyCallCount] = 0
+	expectedCountersValues[unavailableKMSEncryptCallCount] = 0
+	expectedCountersValues[unavailableKMSDecryptCallCount] = 2
+
+	expectedCountersValues[availableKMSGenerateDataKeyCallCount] = 0
+	expectedCountersValues[availableKMSEncryptCallCount] = 0
+	expectedCountersValues[availableKMSDecryptCallCount] = 1
+
+	expectedCountersValues[mockStoreGetEncryptedDataKeysCallCount] = 1
+	expectedCountersValues[mockStoreSetEncryptionDataKeysCallCount] = 0
+
+	verifyCounters(t, counters, expectedCountersValues)
+}
+
+func TestAllServersDownEmptyStore(t *testing.T) {
+	beforeTest()
+
+	regionsAvailable := []bool{false, false, false}
+	dataShouldExistInStore := false
+	r := getRKMS(regionsAvailable, dataShouldExistInStore)
+
+	_, err := r.GetPlaintextDataKey("id")
+	if err == nil {
+		t.Fatalf("should not have received a data key back")
+	}
+
+	expectedCountersValues := make(map[string]int)
+	expectedCountersValues[unavailableKMSGenerateDataKeyCallCount] = 3
+	expectedCountersValues[unavailableKMSEncryptCallCount] = 0
+	expectedCountersValues[unavailableKMSDecryptCallCount] = 0
+
+	expectedCountersValues[availableKMSGenerateDataKeyCallCount] = 0
+	expectedCountersValues[availableKMSEncryptCallCount] = 0
+	expectedCountersValues[availableKMSDecryptCallCount] = 0
+
+	expectedCountersValues[mockStoreGetEncryptedDataKeysCallCount] = 1
+	expectedCountersValues[mockStoreSetEncryptionDataKeysCallCount] = 0
+
+	verifyCounters(t, counters, expectedCountersValues)
+}
+
+func TestAllServersDownFilledStore(t *testing.T) {
+	beforeTest()
+
+	regionsAvailable := []bool{false, false, false}
+	dataShouldExistInStore := true
+	r := getRKMS(regionsAvailable, dataShouldExistInStore)
+
+	_, err := r.GetPlaintextDataKey("id")
+	if err == nil {
+		t.Fatalf("should not have received a data key back")
+	}
+
+	expectedCountersValues := make(map[string]int)
+	expectedCountersValues[unavailableKMSGenerateDataKeyCallCount] = 0
+	expectedCountersValues[unavailableKMSEncryptCallCount] = 0
+	expectedCountersValues[unavailableKMSDecryptCallCount] = 3
+
+	expectedCountersValues[availableKMSGenerateDataKeyCallCount] = 0
+	expectedCountersValues[availableKMSEncryptCallCount] = 0
+	expectedCountersValues[availableKMSDecryptCallCount] = 0
+
+	expectedCountersValues[mockStoreGetEncryptedDataKeysCallCount] = 1
+	expectedCountersValues[mockStoreSetEncryptionDataKeysCallCount] = 0
+
+	verifyCounters(t, counters, expectedCountersValues)
+}
