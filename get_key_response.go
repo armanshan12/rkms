@@ -10,8 +10,8 @@ type getKeyResponse struct {
 }
 
 // ConstructGetKeyResponse creates a server response for GET /key endpoint
-func ConstructGetKeyResponse(id *string, key *string) []byte {
+func ConstructGetKeyResponse(id *string, key *string) string {
 	resp := getKeyResponse{id, key}
 	b, _ := json.Marshal(resp)
-	return b
+	return string(b)
 }

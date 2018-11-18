@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 
 	logger "github.com/sirupsen/logrus"
@@ -25,19 +26,28 @@ func main() {
 	rkmsHandler = rkms
 
 	path := "/api/" + config.Server.APIVersion + "/key"
-	http.HandleFunc(path, getKey)
+	http.HandleFunc(path, decorator(getKey))
 	err = http.ListenAndServe(":"+config.Server.Port, nil)
 	if err != nil {
 		logger.Fatal("ListenAndServe: ", err)
 	}
 }
 
+func decorator(handler func(http.ResponseWriter, *http.Request)) func(http.ResponseWriter, *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		//we will always return in JSON
+		w.Header().Set("Content-Type", "application/json")
+
+		handler(w, r)
+	}
+}
+
 func getKey(w http.ResponseWriter, r *http.Request) {
 	id := r.URL.Query().Get("id")
 	if id == "" {
-		b := ConstructErrorResponse("BadRequest", "id query parameter is required")
-		w.Write(b)
 		w.WriteHeader(http.StatusBadRequest)
+		resp := ConstructErrorResponse("BadRequest", "id query parameter is required")
+		fmt.Fprintln(w, resp)
 		return
 	}
 
@@ -45,13 +55,13 @@ func getKey(w http.ResponseWriter, r *http.Request) {
 	plaintextDataKey, err := rkmsHandler.GetPlaintextDataKey(ctx, id)
 	if err != nil {
 		//TODO: do a better error handling based on the type of error
-		b := ConstructErrorResponse("InternalError", err.Error())
-		w.Write(b)
 		w.WriteHeader(http.StatusInternalServerError)
+		resp := ConstructErrorResponse("InternalServerError", err.Error())
+		fmt.Fprintln(w, resp)
 		return
 	}
 
-	b := ConstructGetKeyResponse(&id, plaintextDataKey)
-	w.Write(b)
 	w.WriteHeader(http.StatusOK)
+	resp := ConstructGetKeyResponse(&id, plaintextDataKey)
+	fmt.Fprintln(w, resp)
 }

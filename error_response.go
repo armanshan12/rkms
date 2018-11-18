@@ -10,8 +10,8 @@ type errorResponse struct {
 }
 
 // ConstructErrorResponse creates a server response for the given error
-func ConstructErrorResponse(errorType string, errorMessage string) []byte {
+func ConstructErrorResponse(errorType string, errorMessage string) string {
 	resp := errorResponse{errorType, errorMessage}
 	b, _ := json.Marshal(resp)
-	return b
+	return string(b)
 }
