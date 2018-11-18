@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -37,8 +39,8 @@ func NewDynamoDBStore(dynamoDBConfig DynamoDBConfig) (*DynamoDBStore, error) {
 }
 
 // GetEncryptedDataKeys retrieves the encrypted data keys for the given id
-func (s *DynamoDBStore) GetEncryptedDataKeys(id string) (map[string]string, error) {
-	result, err := s.client.GetItem(&dynamodb.GetItemInput{
+func (s *DynamoDBStore) GetEncryptedDataKeys(ctx context.Context, id string) (map[string]string, error) {
+	input := &dynamodb.GetItemInput{
 		TableName: s.tableName,
 		Key: map[string]*dynamodb.AttributeValue{
 			"id": {
@@ -46,8 +48,9 @@ func (s *DynamoDBStore) GetEncryptedDataKeys(id string) (map[string]string, erro
 			},
 		},
 		ConsistentRead: aws.Bool(true),
-	})
+	}
 
+	result, err := s.client.GetItemWithContext(ctx, input)
 	if err != nil {
 		logger.Print(err)
 		return nil, err
@@ -70,7 +73,7 @@ func (s *DynamoDBStore) GetEncryptedDataKeys(id string) (map[string]string, erro
 // SetEncryptedDataKeysConditionally sets the encrypted data keys for the given id
 // only if id does not exist in the store already.
 // If the id already exists, an error is returned.
-func (s *DynamoDBStore) SetEncryptedDataKeysConditionally(id string, encryptedKeysMap map[string]string) error {
+func (s *DynamoDBStore) SetEncryptedDataKeysConditionally(ctx context.Context, id string, encryptedKeysMap map[string]string) error {
 	item := item{ID: id, Keys: encryptedKeysMap}
 	marshalledItem, err := dynamodbattribute.MarshalMap(item)
 
@@ -82,7 +85,7 @@ func (s *DynamoDBStore) SetEncryptedDataKeysConditionally(id string, encryptedKe
 		ConditionExpression: aws.String(conditionExpression),
 	}
 
-	_, err = s.client.PutItem(input)
+	_, err = s.client.PutItemWithContext(ctx, input)
 	if err != nil {
 		if awsErr, ok := err.(awserr.Error); ok {
 			if awsErr.Code() == dynamodb.ErrCodeConditionalCheckFailedException {

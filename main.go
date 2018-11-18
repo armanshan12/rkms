@@ -41,7 +41,8 @@ func getKey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	plaintextDataKey, err := rkmsHandler.GetPlaintextDataKey(id)
+	ctx := r.Context()
+	plaintextDataKey, err := rkmsHandler.GetPlaintextDataKey(ctx, id)
 	if err != nil {
 		//TODO: do a better error handling based on the type of error
 		b := ConstructErrorResponse("InternalError", err.Error())
