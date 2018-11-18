@@ -1,11 +1,14 @@
 package main
 
 import (
+	"context"
 	"encoding/base64"
 	"fmt"
 	"strings"
 	"testing"
 
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/service/kms"
 	"github.com/aws/aws-sdk-go/service/kms/kmsiface"
 	logger "github.com/sirupsen/logrus"
@@ -30,17 +33,17 @@ type unavailableKMSClient struct {
 	kmsiface.KMSAPI
 }
 
-func (c *unavailableKMSClient) GenerateDataKey(*kms.GenerateDataKeyInput) (*kms.GenerateDataKeyOutput, error) {
+func (c *unavailableKMSClient) GenerateDataKeyWithContext(aws.Context, *kms.GenerateDataKeyInput, ...request.Option) (*kms.GenerateDataKeyOutput, error) {
 	counters[unavailableKMSGenerateDataKeyCallCount] = counters[unavailableKMSGenerateDataKeyCallCount] + 1
 	return nil, fmt.Errorf("server is unavailable")
 }
 
-func (c *unavailableKMSClient) Encrypt(*kms.EncryptInput) (*kms.EncryptOutput, error) {
+func (c *unavailableKMSClient) EncryptWithContext(aws.Context, *kms.EncryptInput, ...request.Option) (*kms.EncryptOutput, error) {
 	counters[unavailableKMSEncryptCallCount] = counters[unavailableKMSEncryptCallCount] + 1
 	return nil, fmt.Errorf("server is unavailable")
 }
 
-func (c *unavailableKMSClient) Decrypt(*kms.DecryptInput) (*kms.DecryptOutput, error) {
+func (c *unavailableKMSClient) DecryptWithContext(aws.Context, *kms.DecryptInput, ...request.Option) (*kms.DecryptOutput, error) {
 	counters[unavailableKMSDecryptCallCount] = counters[unavailableKMSDecryptCallCount] + 1
 	return nil, fmt.Errorf("server is unavailable")
 }
@@ -49,7 +52,7 @@ type availableKMSClient struct {
 	kmsiface.KMSAPI
 }
 
-func (c *availableKMSClient) GenerateDataKey(input *kms.GenerateDataKeyInput) (*kms.GenerateDataKeyOutput, error) {
+func (c *availableKMSClient) GenerateDataKeyWithContext(ctx aws.Context, input *kms.GenerateDataKeyInput, opts ...request.Option) (*kms.GenerateDataKeyOutput, error) {
 	counters[availableKMSGenerateDataKeyCallCount] = counters[availableKMSGenerateDataKeyCallCount] + 1
 	return &kms.GenerateDataKeyOutput{
 		KeyId:          input.KeyId,
@@ -58,7 +61,7 @@ func (c *availableKMSClient) GenerateDataKey(input *kms.GenerateDataKeyInput) (*
 	}, nil
 }
 
-func (c *availableKMSClient) Encrypt(input *kms.EncryptInput) (*kms.EncryptOutput, error) {
+func (c *availableKMSClient) EncryptWithContext(ctx aws.Context, input *kms.EncryptInput, opts ...request.Option) (*kms.EncryptOutput, error) {
 	counters[availableKMSEncryptCallCount] = counters[availableKMSEncryptCallCount] + 1
 	return &kms.EncryptOutput{
 		KeyId:          input.KeyId,
@@ -66,7 +69,7 @@ func (c *availableKMSClient) Encrypt(input *kms.EncryptInput) (*kms.EncryptOutpu
 	}, nil
 }
 
-func (c *availableKMSClient) Decrypt(input *kms.DecryptInput) (*kms.DecryptOutput, error) {
+func (c *availableKMSClient) DecryptWithContext(ctx aws.Context, input *kms.DecryptInput, opts ...request.Option) (*kms.DecryptOutput, error) {
 	counters[availableKMSDecryptCallCount] = counters[availableKMSDecryptCallCount] + 1
 
 	keyID := "keyId"
@@ -83,7 +86,7 @@ type mockStore struct {
 	numberOfTimesToFailSetConditionally int
 }
 
-func (s *mockStore) GetEncryptedDataKeys(id string) (map[string]string, error) {
+func (s *mockStore) GetEncryptedDataKeys(ctx context.Context, id string) (map[string]string, error) {
 	counters[mockStoreGetEncryptedDataKeysCallCount] = counters[mockStoreGetEncryptedDataKeysCallCount] + 1
 
 	if !s.dataShouldExist {
@@ -98,7 +101,7 @@ func (s *mockStore) GetEncryptedDataKeys(id string) (map[string]string, error) {
 	return keys, nil
 }
 
-func (s *mockStore) SetEncryptedDataKeysConditionally(id string, keys map[string]string) error {
+func (s *mockStore) SetEncryptedDataKeysConditionally(ctx context.Context, id string, keys map[string]string) error {
 	counters[mockStoreSetEncryptionDataKeysCallCount] = counters[mockStoreSetEncryptionDataKeysCallCount] + 1
 
 	if s.numberOfTimesToFailSetConditionally > 0 {
@@ -171,7 +174,7 @@ func TestServersUpEmptyStore(t *testing.T) {
 		mockStore.dataShouldExist = false
 	}
 
-	base64Plaintext, err := r.GetPlaintextDataKey("id")
+	base64Plaintext, err := r.GetPlaintextDataKey(context.Background(), "id")
 	if err != nil {
 		t.Fatalf("was not able to get plaintext: %s", err)
 	}
@@ -209,7 +212,7 @@ func TestServersUpFilledStore(t *testing.T) {
 		mockStore.dataShouldExist = true
 	}
 
-	base64Plaintext, err := r.GetPlaintextDataKey("id")
+	base64Plaintext, err := r.GetPlaintextDataKey(context.Background(), "id")
 	if err != nil {
 		t.Fatalf("was not able to get plaintext: %s", err)
 	}
@@ -247,7 +250,7 @@ func TestFirstServerDownEmptyStore(t *testing.T) {
 		mockStore.dataShouldExist = false
 	}
 
-	_, err := r.GetPlaintextDataKey("id")
+	_, err := r.GetPlaintextDataKey(context.Background(), "id")
 	if err == nil {
 		t.Fatalf("should not have received a data key back")
 	}
@@ -276,7 +279,7 @@ func TestFirstServerDownFilledStore(t *testing.T) {
 		mockStore.dataShouldExist = true
 	}
 
-	base64Plaintext, err := r.GetPlaintextDataKey("id")
+	base64Plaintext, err := r.GetPlaintextDataKey(context.Background(), "id")
 	if err != nil {
 		t.Fatalf("was not able to get plaintext: %s", err)
 	}
@@ -314,7 +317,7 @@ func TestFirstTwoServersDownEmptyStore(t *testing.T) {
 		mockStore.dataShouldExist = false
 	}
 
-	_, err := r.GetPlaintextDataKey("id")
+	_, err := r.GetPlaintextDataKey(context.Background(), "id")
 	if err == nil {
 		t.Fatalf("should not have received a data key back")
 	}
@@ -343,7 +346,7 @@ func TestFirstTwoServersDownFilledStore(t *testing.T) {
 		mockStore.dataShouldExist = true
 	}
 
-	base64Plaintext, err := r.GetPlaintextDataKey("id")
+	base64Plaintext, err := r.GetPlaintextDataKey(context.Background(), "id")
 	if err != nil {
 		t.Fatalf("was not able to get plaintext: %s", err)
 	}
@@ -381,7 +384,7 @@ func TestAllServersDownEmptyStore(t *testing.T) {
 		mockStore.dataShouldExist = false
 	}
 
-	_, err := r.GetPlaintextDataKey("id")
+	_, err := r.GetPlaintextDataKey(context.Background(), "id")
 	if err == nil {
 		t.Fatalf("should not have received a data key back")
 	}
@@ -410,7 +413,7 @@ func TestAllServersDownFilledStore(t *testing.T) {
 		mockStore.dataShouldExist = true
 	}
 
-	_, err := r.GetPlaintextDataKey("id")
+	_, err := r.GetPlaintextDataKey(context.Background(), "id")
 	if err == nil {
 		t.Fatalf("should not have received a data key back")
 	}
@@ -440,7 +443,7 @@ func TestConditionalWriteToStore(t *testing.T) {
 		mockStore.numberOfTimesToFailSetConditionally = 1
 	}
 
-	base64Plaintext, err := r.GetPlaintextDataKey("id")
+	base64Plaintext, err := r.GetPlaintextDataKey(context.Background(), "id")
 	if err != nil {
 		t.Fatalf("was not able to get plaintext: %s", err)
 	}
@@ -475,7 +478,7 @@ func TestGetPLaintextDataKeyRetrySuccess(t *testing.T) {
 		mockStore.numberOfTimesToFailSetConditionally = MaxNumberOfGetPlaintextDataKeyTries - 1
 	}
 
-	base64Plaintext, err := r.GetPlaintextDataKey("id")
+	base64Plaintext, err := r.GetPlaintextDataKey(context.Background(), "id")
 	if err != nil {
 		t.Fatalf("was not able to get plaintext: %s", err)
 	}
@@ -510,7 +513,7 @@ func TestGetPLaintextDataKeyRetryFail(t *testing.T) {
 		mockStore.numberOfTimesToFailSetConditionally = MaxNumberOfGetPlaintextDataKeyTries
 	}
 
-	_, err := r.GetPlaintextDataKey("id")
+	_, err := r.GetPlaintextDataKey(context.Background(), "id")
 	if err == nil {
 		t.Fatalf("should not have received a data key back")
 	}
