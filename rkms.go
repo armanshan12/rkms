@@ -172,12 +172,12 @@ func (r *RKMS) createDataKeyForID(ctx context.Context, id string) (*string, erro
 
 func (r *RKMS) createDataKey(ctx context.Context) (*string, *string, *string, error) {
 	for _, region := range r.regions {
-		client := r.clients[region]
-		result, err := client.GenerateDataKeyWithContext(ctx, &kms.GenerateDataKeyInput{
+		input := &kms.GenerateDataKeyInput{
 			KeyId:         r.keyIds[region],
 			NumberOfBytes: aws.Int64(r.dataKeySizeInBytes),
-		})
+		}
 
+		result, err := r.clients[region].GenerateDataKeyWithContext(ctx, input)
 		if err != nil { //failed to create data key in this region
 			logger.Error(err)
 			continue
@@ -198,12 +198,12 @@ func (r *RKMS) encryptDataKey(ctx context.Context, dataKey *string, region *stri
 		return nil, err
 	}
 
-	client := r.clients[*region]
-	result, err := client.EncryptWithContext(ctx, &kms.EncryptInput{
+	input := &kms.EncryptInput{
 		KeyId:     r.keyIds[*region],
 		Plaintext: plaintext,
-	})
+	}
 
+	result, err := r.clients[*region].EncryptWithContext(ctx, input)
 	if err != nil { //failed to create data key in this region
 		logger.Error(err)
 		return nil, err
@@ -218,8 +218,6 @@ func (r *RKMS) decryptDataKey(ctx context.Context, encryptedDataKeys map[string]
 
 	//TODO: make parallelism configurable (e.g. request all KMS regions at the same time for the decrypted data key)
 	for _, region := range r.regions {
-		client := r.clients[region]
-
 		ciphertext, err := base64.StdEncoding.DecodeString(encryptedDataKeys[region])
 		if err != nil {
 			//TODO(enhancement): fix it asyncrounously
@@ -228,10 +226,11 @@ func (r *RKMS) decryptDataKey(ctx context.Context, encryptedDataKeys map[string]
 			continue
 		}
 
-		result, err := client.DecryptWithContext(ctx, &kms.DecryptInput{
+		input := &kms.DecryptInput{
 			CiphertextBlob: ciphertext,
-		})
+		}
 
+		result, err := r.clients[region].DecryptWithContext(ctx, input)
 		if err != nil { //failed to decrypt in this region
 			logger.Error(err)
 			lastError = err
