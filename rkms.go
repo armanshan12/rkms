@@ -159,8 +159,8 @@ func (r *RKMS) createDataKeyForID(ctx context.Context, id string) (*string, erro
 			continue
 		}
 
-		go func(ctx context.Context, resultsChannel chan encryptDataKeyResult, plaintextDataKey *string, region string) {
-			logger.Debugf("encrypting data key in %s region\n", region)
+		go func(ctx context.Context, resultsChannel chan<- encryptDataKeyResult, plaintextDataKey *string, region string) {
+			logger.Debugf("encrypting data key in %s region", region)
 			ciphertext, err := r.encryptDataKey(ctx, plaintextDataKey, &region)
 			resultsChannel <- encryptDataKeyResult{region, ciphertext, err}
 		}(childCtx, resultsChannel, plaintextDataKey, region)
@@ -171,13 +171,11 @@ func (r *RKMS) createDataKeyForID(ctx context.Context, id string) (*string, erro
 		case result := <-resultsChannel:
 			if result.err != nil {
 				logger.Errorf("failed to encrypt data key in %s region: %s", result.region, result.err)
-				cancel()
 				return nil, result.err
 			}
 
 			encryptedDataKeys[result.region] = *result.ciphertext
 		case <-ctx.Done():
-			cancel()
 			return nil, fmt.Errorf("cancelled while encrypting data key in all regions")
 		}
 	}
