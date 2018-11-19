@@ -132,6 +132,12 @@ func (r *RKMS) lookInStoreForDataKey(ctx context.Context, id string) (*string, e
 	return plaintextDataKey, err
 }
 
+type encryptDataKeyResult struct {
+	region     string
+	ciphertext *string
+	err        error
+}
+
 func (r *RKMS) createDataKeyForID(ctx context.Context, id string) (*string, error) {
 	logger.Debugln("creating data key...")
 	firstRegion, plaintextDataKey, firstRegionCiphertext, err := r.createDataKey(ctx)
@@ -143,20 +149,35 @@ func (r *RKMS) createDataKeyForID(ctx context.Context, id string) (*string, erro
 	encryptedDataKeys := make(map[string]string)
 	encryptedDataKeys[*firstRegion] = *firstRegionCiphertext
 
+	resultsChannel := make(chan encryptDataKeyResult, len(r.regions)-1)
+	childCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	logger.Debugln("encrypting generated data key in every region...")
 	for _, region := range r.regions {
 		if strings.Compare(region, *firstRegion) == 0 { //we have already encrypted in this region and have the ciphertext
 			continue
 		}
 
-		//TODO: parallelize encryptDataKey calls to every region
-		ciphertext, err := r.encryptDataKey(ctx, plaintextDataKey, &region)
-		if err != nil {
-			logger.Errorf("failed to encrypt data key in %s region: %s", region, err)
-			return nil, err
-		}
+		go func(ctx context.Context, resultsChannel chan<- encryptDataKeyResult, plaintextDataKey *string, region string) {
+			logger.Debugf("encrypting data key in %s region", region)
+			ciphertext, err := r.encryptDataKey(ctx, plaintextDataKey, &region)
+			resultsChannel <- encryptDataKeyResult{region, ciphertext, err}
+		}(childCtx, resultsChannel, plaintextDataKey, region)
+	}
 
-		encryptedDataKeys[region] = *ciphertext
+	for i := 0; i < len(r.regions)-1; i++ {
+		select {
+		case result := <-resultsChannel:
+			if result.err != nil {
+				logger.Errorf("failed to encrypt data key in %s region: %s", result.region, result.err)
+				return nil, result.err
+			}
+
+			encryptedDataKeys[result.region] = *result.ciphertext
+		case <-ctx.Done():
+			return nil, fmt.Errorf("cancelled while encrypting data key in all regions")
+		}
 	}
 
 	logger.Debugln("saving encrypted data keys in store...")

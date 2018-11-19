@@ -261,7 +261,6 @@ func TestFirstServerDownEmptyStore(t *testing.T) {
 	expectedCountersValues[unavailableKMSDecryptCallCount] = 0
 
 	expectedCountersValues[availableKMSGenerateDataKeyCallCount] = 1
-	expectedCountersValues[availableKMSEncryptCallCount] = 0
 	expectedCountersValues[availableKMSDecryptCallCount] = 0
 
 	expectedCountersValues[mockStoreGetEncryptedDataKeysCallCount] = 1
@@ -299,7 +298,6 @@ func TestFirstServerDownFilledStore(t *testing.T) {
 	expectedCountersValues[unavailableKMSDecryptCallCount] = 1
 
 	expectedCountersValues[availableKMSGenerateDataKeyCallCount] = 0
-	expectedCountersValues[availableKMSEncryptCallCount] = 0
 	expectedCountersValues[availableKMSDecryptCallCount] = 1
 
 	expectedCountersValues[mockStoreGetEncryptedDataKeysCallCount] = 1
@@ -324,7 +322,6 @@ func TestFirstTwoServersDownEmptyStore(t *testing.T) {
 
 	expectedCountersValues := make(map[string]int)
 	expectedCountersValues[unavailableKMSGenerateDataKeyCallCount] = 2
-	expectedCountersValues[unavailableKMSEncryptCallCount] = 1
 	expectedCountersValues[unavailableKMSDecryptCallCount] = 0
 
 	expectedCountersValues[availableKMSGenerateDataKeyCallCount] = 1
@@ -362,7 +359,6 @@ func TestFirstTwoServersDownFilledStore(t *testing.T) {
 
 	expectedCountersValues := make(map[string]int)
 	expectedCountersValues[unavailableKMSGenerateDataKeyCallCount] = 0
-	expectedCountersValues[unavailableKMSEncryptCallCount] = 0
 	expectedCountersValues[unavailableKMSDecryptCallCount] = 2
 
 	expectedCountersValues[availableKMSGenerateDataKeyCallCount] = 0
@@ -391,7 +387,6 @@ func TestAllServersDownEmptyStore(t *testing.T) {
 
 	expectedCountersValues := make(map[string]int)
 	expectedCountersValues[unavailableKMSGenerateDataKeyCallCount] = 3
-	expectedCountersValues[unavailableKMSEncryptCallCount] = 0
 	expectedCountersValues[unavailableKMSDecryptCallCount] = 0
 
 	expectedCountersValues[availableKMSGenerateDataKeyCallCount] = 0
