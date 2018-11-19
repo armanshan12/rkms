@@ -149,7 +149,7 @@ func (r *RKMS) createDataKeyForID(ctx context.Context, id string) (*string, erro
 	encryptedDataKeys := make(map[string]string)
 	encryptedDataKeys[*firstRegion] = *firstRegionCiphertext
 
-	resultsChannel := make(chan encryptDataKeyResult, len(r.regions))
+	resultsChannel := make(chan encryptDataKeyResult, len(r.regions)-1)
 	childCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
