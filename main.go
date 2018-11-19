@@ -62,6 +62,6 @@ func getKey(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
-	resp := ConstructGetKeyResponse(&id, plaintextDataKey)
+	resp := ConstructGetKeyResponse(id, *plaintextDataKey)
 	fmt.Fprintln(w, resp)
 }

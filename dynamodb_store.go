@@ -13,7 +13,6 @@ import (
 
 // DynamoDBStore - a DynamoDB implementation of a key/value store for KMS-related data
 type DynamoDBStore struct {
-	region    string
 	tableName *string
 	client    *dynamodb.DynamoDB
 }
@@ -35,7 +34,7 @@ func NewDynamoDBStore(dynamoDBConfig DynamoDBConfig) (*DynamoDBStore, error) {
 	}
 
 	client := dynamodb.New(sess)
-	return &DynamoDBStore{dynamoDBConfig.Region, aws.String(dynamoDBConfig.TableName), client}, nil
+	return &DynamoDBStore{aws.String(dynamoDBConfig.TableName), client}, nil
 }
 
 // GetEncryptedDataKeys retrieves the encrypted data keys for the given id
@@ -78,7 +77,6 @@ func (s *DynamoDBStore) SetEncryptedDataKeysConditionally(ctx context.Context, i
 	marshalledItem, err := dynamodbattribute.MarshalMap(item)
 
 	conditionExpression := "attribute_not_exists(id)"
-
 	input := &dynamodb.PutItemInput{
 		TableName:           s.tableName,
 		Item:                marshalledItem,

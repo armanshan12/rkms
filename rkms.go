@@ -159,11 +159,11 @@ func (r *RKMS) createDataKeyForID(ctx context.Context, id string) (*string, erro
 			continue
 		}
 
-		go func(ctx context.Context, resultsChannel chan<- encryptDataKeyResult, plaintextDataKey *string, region string) {
+		go func(ctx context.Context, resultsChannel chan<- encryptDataKeyResult, plaintextDataKey string, region string) {
 			logger.Debugf("encrypting data key in %s region", region)
-			ciphertext, err := r.encryptDataKey(ctx, plaintextDataKey, &region)
+			ciphertext, err := r.encryptDataKey(ctx, plaintextDataKey, region)
 			resultsChannel <- encryptDataKeyResult{region, ciphertext, err}
-		}(childCtx, resultsChannel, plaintextDataKey, region)
+		}(childCtx, resultsChannel, *plaintextDataKey, region)
 	}
 
 	for i := 0; i < len(r.regions)-1; i++ {
@@ -212,19 +212,19 @@ func (r *RKMS) createDataKey(ctx context.Context) (*string, *string, *string, er
 	return nil, nil, nil, fmt.Errorf("failed to create a data key in every region")
 }
 
-func (r *RKMS) encryptDataKey(ctx context.Context, dataKey *string, region *string) (*string, error) {
-	plaintext, err := base64.StdEncoding.DecodeString(*dataKey)
+func (r *RKMS) encryptDataKey(ctx context.Context, dataKey string, region string) (*string, error) {
+	plaintext, err := base64.StdEncoding.DecodeString(dataKey)
 	if err != nil {
 		logger.Error(err)
 		return nil, err
 	}
 
 	input := &kms.EncryptInput{
-		KeyId:     r.keyIds[*region],
+		KeyId:     r.keyIds[region],
 		Plaintext: plaintext,
 	}
 
-	result, err := r.clients[*region].EncryptWithContext(ctx, input)
+	result, err := r.clients[region].EncryptWithContext(ctx, input)
 	if err != nil { //failed to create data key in this region
 		logger.Error(err)
 		return nil, err
