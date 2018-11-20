@@ -14,37 +14,19 @@ import (
 	logger "github.com/sirupsen/logrus"
 )
 
-const (
-	unavailableKMSGenerateDataKeyCallCount = "unavailableKMS:GenerateDataKey"
-	unavailableKMSEncryptCallCount         = "unavailableKMS:Encrypt"
-	unavailableKMSDecryptCallCount         = "unavailableKMS:Decrypt"
-
-	availableKMSGenerateDataKeyCallCount = "availableKMS:GenerateDataKey"
-	availableKMSEncryptCallCount         = "availableKMS:Encrypt"
-	availableKMSDecryptCallCount         = "availableKMS:Decrypt"
-
-	mockStoreGetEncryptedDataKeysCallCount  = "mockStore:GetEncryptedDataKeys"
-	mockStoreSetEncryptionDataKeysCallCount = "mockStore:SetEncryptionDataKeys"
-)
-
-var counters map[string]int
-
 type unavailableKMSClient struct {
 	kmsiface.KMSAPI
 }
 
 func (c *unavailableKMSClient) GenerateDataKeyWithContext(aws.Context, *kms.GenerateDataKeyInput, ...request.Option) (*kms.GenerateDataKeyOutput, error) {
-	counters[unavailableKMSGenerateDataKeyCallCount] = counters[unavailableKMSGenerateDataKeyCallCount] + 1
 	return nil, fmt.Errorf("server is unavailable")
 }
 
 func (c *unavailableKMSClient) EncryptWithContext(aws.Context, *kms.EncryptInput, ...request.Option) (*kms.EncryptOutput, error) {
-	counters[unavailableKMSEncryptCallCount] = counters[unavailableKMSEncryptCallCount] + 1
 	return nil, fmt.Errorf("server is unavailable")
 }
 
 func (c *unavailableKMSClient) DecryptWithContext(aws.Context, *kms.DecryptInput, ...request.Option) (*kms.DecryptOutput, error) {
-	counters[unavailableKMSDecryptCallCount] = counters[unavailableKMSDecryptCallCount] + 1
 	return nil, fmt.Errorf("server is unavailable")
 }
 
@@ -53,7 +35,6 @@ type availableKMSClient struct {
 }
 
 func (c *availableKMSClient) GenerateDataKeyWithContext(ctx aws.Context, input *kms.GenerateDataKeyInput, opts ...request.Option) (*kms.GenerateDataKeyOutput, error) {
-	counters[availableKMSGenerateDataKeyCallCount] = counters[availableKMSGenerateDataKeyCallCount] + 1
 	return &kms.GenerateDataKeyOutput{
 		KeyId:          input.KeyId,
 		Plaintext:      []byte("plaintext"),
@@ -62,7 +43,6 @@ func (c *availableKMSClient) GenerateDataKeyWithContext(ctx aws.Context, input *
 }
 
 func (c *availableKMSClient) EncryptWithContext(ctx aws.Context, input *kms.EncryptInput, opts ...request.Option) (*kms.EncryptOutput, error) {
-	counters[availableKMSEncryptCallCount] = counters[availableKMSEncryptCallCount] + 1
 	return &kms.EncryptOutput{
 		KeyId:          input.KeyId,
 		CiphertextBlob: []byte("ciphertext"),
@@ -70,8 +50,6 @@ func (c *availableKMSClient) EncryptWithContext(ctx aws.Context, input *kms.Encr
 }
 
 func (c *availableKMSClient) DecryptWithContext(ctx aws.Context, input *kms.DecryptInput, opts ...request.Option) (*kms.DecryptOutput, error) {
-	counters[availableKMSDecryptCallCount] = counters[availableKMSDecryptCallCount] + 1
-
 	keyID := "keyId"
 	return &kms.DecryptOutput{
 		KeyId:     &keyID,
@@ -87,8 +65,6 @@ type mockStore struct {
 }
 
 func (s *mockStore) GetEncryptedDataKeys(ctx context.Context, id string) (map[string]string, error) {
-	counters[mockStoreGetEncryptedDataKeysCallCount] = counters[mockStoreGetEncryptedDataKeysCallCount] + 1
-
 	if !s.dataShouldExist {
 		return nil, nil
 	}
@@ -102,8 +78,6 @@ func (s *mockStore) GetEncryptedDataKeys(ctx context.Context, id string) (map[st
 }
 
 func (s *mockStore) SetEncryptedDataKeysConditionally(ctx context.Context, id string, keys map[string]string) error {
-	counters[mockStoreSetEncryptionDataKeysCallCount] = counters[mockStoreSetEncryptionDataKeysCallCount] + 1
-
 	if s.numberOfTimesToFailSetConditionally > 0 {
 		s.numberOfTimesToFailSetConditionally--
 		if s.numberOfTimesToFailSetConditionally == 0 {
@@ -150,20 +124,8 @@ func getTestKeyID(regionName string) string {
 	return fmt.Sprintf("alias/kms-%s", regionName)
 }
 
-func verifyCounters(t *testing.T, actualCountersValues map[string]int, expectedCountersValues map[string]int) {
-	//iterating over expected values instead of actual values in case
-	//we don't care for all the values captured
-	for counterName, expectedValue := range expectedCountersValues {
-		actualValue := actualCountersValues[counterName]
-		if actualValue != expectedValue {
-			t.Fatalf("actual value (%d) does not match expected value (%d) for %s counter", actualValue, expectedValue, counterName)
-		}
-	}
-}
-
 func beforeTest() {
 	logger.SetLevel(logger.DebugLevel)
-	counters = make(map[string]int)
 }
 func TestServersUpEmptyStore(t *testing.T) {
 	beforeTest()
@@ -187,20 +149,6 @@ func TestServersUpEmptyStore(t *testing.T) {
 	if strings.Compare(string(plaintext), "plaintext") != 0 {
 		t.Fatalf("returned plaintext data key is wrong: %s", plaintext)
 	}
-
-	expectedCountersValues := make(map[string]int)
-	expectedCountersValues[unavailableKMSGenerateDataKeyCallCount] = 0
-	expectedCountersValues[unavailableKMSEncryptCallCount] = 0
-	expectedCountersValues[unavailableKMSDecryptCallCount] = 0
-
-	expectedCountersValues[availableKMSGenerateDataKeyCallCount] = 1
-	expectedCountersValues[availableKMSEncryptCallCount] = 2
-	expectedCountersValues[availableKMSDecryptCallCount] = 0
-
-	expectedCountersValues[mockStoreGetEncryptedDataKeysCallCount] = 1
-	expectedCountersValues[mockStoreSetEncryptionDataKeysCallCount] = 1
-
-	verifyCounters(t, counters, expectedCountersValues)
 }
 
 func TestServersUpFilledStore(t *testing.T) {
@@ -225,20 +173,6 @@ func TestServersUpFilledStore(t *testing.T) {
 	if strings.Compare(string(plaintext), "plaintext") != 0 {
 		t.Fatalf("returned plaintext data key is wrong: %s", plaintext)
 	}
-
-	expectedCountersValues := make(map[string]int)
-	expectedCountersValues[unavailableKMSGenerateDataKeyCallCount] = 0
-	expectedCountersValues[unavailableKMSEncryptCallCount] = 0
-	expectedCountersValues[unavailableKMSDecryptCallCount] = 0
-
-	expectedCountersValues[availableKMSGenerateDataKeyCallCount] = 0
-	expectedCountersValues[availableKMSEncryptCallCount] = 0
-	expectedCountersValues[availableKMSDecryptCallCount] = 1
-
-	expectedCountersValues[mockStoreGetEncryptedDataKeysCallCount] = 1
-	expectedCountersValues[mockStoreSetEncryptionDataKeysCallCount] = 0
-
-	verifyCounters(t, counters, expectedCountersValues)
 }
 
 func TestFirstServerDownEmptyStore(t *testing.T) {
@@ -254,19 +188,6 @@ func TestFirstServerDownEmptyStore(t *testing.T) {
 	if err == nil {
 		t.Fatalf("should not have received a data key back")
 	}
-
-	expectedCountersValues := make(map[string]int)
-	expectedCountersValues[unavailableKMSGenerateDataKeyCallCount] = 1
-	expectedCountersValues[unavailableKMSEncryptCallCount] = 1
-	expectedCountersValues[unavailableKMSDecryptCallCount] = 0
-
-	expectedCountersValues[availableKMSGenerateDataKeyCallCount] = 1
-	expectedCountersValues[availableKMSDecryptCallCount] = 0
-
-	expectedCountersValues[mockStoreGetEncryptedDataKeysCallCount] = 1
-	expectedCountersValues[mockStoreSetEncryptionDataKeysCallCount] = 0
-
-	verifyCounters(t, counters, expectedCountersValues)
 }
 
 func TestFirstServerDownFilledStore(t *testing.T) {
@@ -291,19 +212,6 @@ func TestFirstServerDownFilledStore(t *testing.T) {
 	if strings.Compare(string(plaintext), "plaintext") != 0 {
 		t.Fatalf("returned plaintext data key is wrong: %s", plaintext)
 	}
-
-	expectedCountersValues := make(map[string]int)
-	expectedCountersValues[unavailableKMSGenerateDataKeyCallCount] = 0
-	expectedCountersValues[unavailableKMSEncryptCallCount] = 0
-	expectedCountersValues[unavailableKMSDecryptCallCount] = 1
-
-	expectedCountersValues[availableKMSGenerateDataKeyCallCount] = 0
-	expectedCountersValues[availableKMSDecryptCallCount] = 1
-
-	expectedCountersValues[mockStoreGetEncryptedDataKeysCallCount] = 1
-	expectedCountersValues[mockStoreSetEncryptionDataKeysCallCount] = 0
-
-	verifyCounters(t, counters, expectedCountersValues)
 }
 
 func TestFirstTwoServersDownEmptyStore(t *testing.T) {
@@ -319,19 +227,6 @@ func TestFirstTwoServersDownEmptyStore(t *testing.T) {
 	if err == nil {
 		t.Fatalf("should not have received a data key back")
 	}
-
-	expectedCountersValues := make(map[string]int)
-	expectedCountersValues[unavailableKMSGenerateDataKeyCallCount] = 2
-	expectedCountersValues[unavailableKMSDecryptCallCount] = 0
-
-	expectedCountersValues[availableKMSGenerateDataKeyCallCount] = 1
-	expectedCountersValues[availableKMSEncryptCallCount] = 0
-	expectedCountersValues[availableKMSDecryptCallCount] = 0
-
-	expectedCountersValues[mockStoreGetEncryptedDataKeysCallCount] = 1
-	expectedCountersValues[mockStoreSetEncryptionDataKeysCallCount] = 0
-
-	verifyCounters(t, counters, expectedCountersValues)
 }
 
 func TestFirstTwoServersDownFilledStore(t *testing.T) {
@@ -356,19 +251,6 @@ func TestFirstTwoServersDownFilledStore(t *testing.T) {
 	if strings.Compare(string(plaintext), "plaintext") != 0 {
 		t.Fatalf("returned plaintext data key is wrong: %s", plaintext)
 	}
-
-	expectedCountersValues := make(map[string]int)
-	expectedCountersValues[unavailableKMSGenerateDataKeyCallCount] = 0
-	expectedCountersValues[unavailableKMSDecryptCallCount] = 2
-
-	expectedCountersValues[availableKMSGenerateDataKeyCallCount] = 0
-	expectedCountersValues[availableKMSEncryptCallCount] = 0
-	expectedCountersValues[availableKMSDecryptCallCount] = 1
-
-	expectedCountersValues[mockStoreGetEncryptedDataKeysCallCount] = 1
-	expectedCountersValues[mockStoreSetEncryptionDataKeysCallCount] = 0
-
-	verifyCounters(t, counters, expectedCountersValues)
 }
 
 func TestAllServersDownEmptyStore(t *testing.T) {
@@ -384,19 +266,6 @@ func TestAllServersDownEmptyStore(t *testing.T) {
 	if err == nil {
 		t.Fatalf("should not have received a data key back")
 	}
-
-	expectedCountersValues := make(map[string]int)
-	expectedCountersValues[unavailableKMSGenerateDataKeyCallCount] = 3
-	expectedCountersValues[unavailableKMSDecryptCallCount] = 0
-
-	expectedCountersValues[availableKMSGenerateDataKeyCallCount] = 0
-	expectedCountersValues[availableKMSEncryptCallCount] = 0
-	expectedCountersValues[availableKMSDecryptCallCount] = 0
-
-	expectedCountersValues[mockStoreGetEncryptedDataKeysCallCount] = 1
-	expectedCountersValues[mockStoreSetEncryptionDataKeysCallCount] = 0
-
-	verifyCounters(t, counters, expectedCountersValues)
 }
 
 func TestAllServersDownFilledStore(t *testing.T) {
@@ -412,20 +281,6 @@ func TestAllServersDownFilledStore(t *testing.T) {
 	if err == nil {
 		t.Fatalf("should not have received a data key back")
 	}
-
-	expectedCountersValues := make(map[string]int)
-	expectedCountersValues[unavailableKMSGenerateDataKeyCallCount] = 0
-	expectedCountersValues[unavailableKMSEncryptCallCount] = 0
-	expectedCountersValues[unavailableKMSDecryptCallCount] = 3
-
-	expectedCountersValues[availableKMSGenerateDataKeyCallCount] = 0
-	expectedCountersValues[availableKMSEncryptCallCount] = 0
-	expectedCountersValues[availableKMSDecryptCallCount] = 0
-
-	expectedCountersValues[mockStoreGetEncryptedDataKeysCallCount] = 1
-	expectedCountersValues[mockStoreSetEncryptionDataKeysCallCount] = 0
-
-	verifyCounters(t, counters, expectedCountersValues)
 }
 
 func TestConditionalWriteToStore(t *testing.T) {
@@ -451,16 +306,6 @@ func TestConditionalWriteToStore(t *testing.T) {
 	if strings.Compare(string(plaintext), "plaintext") != 0 {
 		t.Fatalf("returned plaintext data key is wrong: %s", plaintext)
 	}
-
-	expectedCountersValues := make(map[string]int)
-	expectedCountersValues[availableKMSGenerateDataKeyCallCount] = 1
-	expectedCountersValues[availableKMSEncryptCallCount] = 2
-	expectedCountersValues[availableKMSDecryptCallCount] = 1
-
-	expectedCountersValues[mockStoreGetEncryptedDataKeysCallCount] = 2
-	expectedCountersValues[mockStoreSetEncryptionDataKeysCallCount] = 1
-
-	verifyCounters(t, counters, expectedCountersValues)
 }
 
 func TestGetPLaintextDataKeyRetrySuccess(t *testing.T) {
@@ -486,16 +331,6 @@ func TestGetPLaintextDataKeyRetrySuccess(t *testing.T) {
 	if strings.Compare(string(plaintext), "plaintext") != 0 {
 		t.Fatalf("returned plaintext data key is wrong: %s", plaintext)
 	}
-
-	expectedCountersValues := make(map[string]int)
-	expectedCountersValues[availableKMSGenerateDataKeyCallCount] = 2
-	expectedCountersValues[availableKMSEncryptCallCount] = 4
-	expectedCountersValues[availableKMSDecryptCallCount] = 1
-
-	expectedCountersValues[mockStoreGetEncryptedDataKeysCallCount] = 3
-	expectedCountersValues[mockStoreSetEncryptionDataKeysCallCount] = 2
-
-	verifyCounters(t, counters, expectedCountersValues)
 }
 
 func TestGetPLaintextDataKeyRetryFail(t *testing.T) {
@@ -512,14 +347,4 @@ func TestGetPLaintextDataKeyRetryFail(t *testing.T) {
 	if err == nil {
 		t.Fatalf("should not have received a data key back")
 	}
-
-	expectedCountersValues := make(map[string]int)
-	expectedCountersValues[availableKMSGenerateDataKeyCallCount] = 3
-	expectedCountersValues[availableKMSEncryptCallCount] = 6
-	expectedCountersValues[availableKMSDecryptCallCount] = 0
-
-	expectedCountersValues[mockStoreGetEncryptedDataKeysCallCount] = 3
-	expectedCountersValues[mockStoreSetEncryptionDataKeysCallCount] = 3
-
-	verifyCounters(t, counters, expectedCountersValues)
 }
