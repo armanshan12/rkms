@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/kms"
 	"github.com/aws/aws-sdk-go/service/kms/kmsiface"
@@ -234,33 +236,61 @@ func (r *RKMS) encryptDataKey(ctx context.Context, dataKey string, region string
 	return &ciphertext, nil
 }
 
+type decryptDataKeyResult struct {
+	region    string
+	plaintext *string
+	err       error
+}
+
 func (r *RKMS) decryptDataKey(ctx context.Context, encryptedDataKeys map[string]string) (*string, error) {
-	var lastError error
+	resultsChannel := make(chan decryptDataKeyResult, len(r.regions))
+	childCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
-	//TODO: make parallelism configurable (e.g. request all KMS regions at the same time for the decrypted data key)
+	//TODO(enhancement): add config param to run this serially if wanted
 	for _, region := range r.regions {
-		ciphertext, err := base64.StdEncoding.DecodeString(encryptedDataKeys[region])
-		if err != nil {
-			//TODO(enhancement): fix it asyncrounously
-			logger.Errorf("ciphertext value is corrupted in the store for %s region: %s", region, err)
-			lastError = err
-			continue
-		}
+		go func(ctx context.Context, resultsChannel chan<- decryptDataKeyResult, ciphertext string, region string) {
+			ciphertextBlob, err := base64.StdEncoding.DecodeString(ciphertext)
+			if err != nil {
+				//TODO(enhancement): fix it asyncrounously
+				logger.Errorf("ciphertext value is corrupted in the store for %s region: %s", region, err)
+				resultsChannel <- decryptDataKeyResult{region, nil, err}
+				return
+			}
 
-		input := &kms.DecryptInput{
-			CiphertextBlob: ciphertext,
-		}
+			input := &kms.DecryptInput{
+				CiphertextBlob: ciphertextBlob,
+			}
 
-		result, err := r.clients[region].DecryptWithContext(ctx, input)
-		if err != nil { //failed to decrypt in this region
-			logger.Error(err)
-			lastError = err
-			continue
-		}
+			logger.Debugf("decrypting data key in %s region", region)
+			result, err := r.clients[region].DecryptWithContext(ctx, input)
+			if err != nil { //failed to decrypt in this region
+				if aerr, ok := err.(awserr.Error); ok && aerr.Code() != request.CanceledErrorCode {
+					logger.Errorf("failed to decrypt in %s region: %s", region, err)
+				}
+				resultsChannel <- decryptDataKeyResult{region, nil, err}
+				return
+			}
 
-		dataKey := base64.StdEncoding.EncodeToString(result.Plaintext)
-		return &dataKey, nil
+			dataKey := base64.StdEncoding.EncodeToString(result.Plaintext)
+			resultsChannel <- decryptDataKeyResult{region, &dataKey, nil}
+		}(childCtx, resultsChannel, encryptedDataKeys[region], region)
 	}
 
-	return nil, lastError
+	for i := 0; i < len(r.regions); i++ {
+		select {
+		case result := <-resultsChannel:
+			if result.err != nil {
+				logger.Infof("failed to decrypt data key in %s region: %s", result.region, result.err)
+				continue
+			}
+
+			logger.Debugf("successfully decrypted data key in %s region", result.region)
+			return result.plaintext, nil
+		case <-ctx.Done():
+			return nil, fmt.Errorf("cancelled while decrypting data key in all regions")
+		}
+	}
+
+	return nil, fmt.Errorf("failed to decrypt data key in all regions")
 }
