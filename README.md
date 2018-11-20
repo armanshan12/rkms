@@ -51,6 +51,7 @@ Contributions to this project are very welcome! You can even contribute by simpl
 
 Things I would like to do in the future (which you can help with!) are:
 - Write more tests
+- Add `DELETE /key?id=<id>` endpoint to allow deletion
 - Create a Makefile
 - Create a Dockerfile
 - Create Helm chart
