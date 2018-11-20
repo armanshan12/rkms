@@ -12,7 +12,7 @@ Before we look at how RKMS is designed, let's go over the main functionalities A
 - `Encrypt(data, kmsKeyId)`: encrypts data with the specified KMS key
 - `Decrypt(data, kmsKeyId)`: decrypts data with the specified KMS key
 
-RKMS has only one endpoint (`GET /key?id=<id>`) and roughly, it does the following:
+RKMS's main endpoint is `GET /key?id=<id>`, which roughly does the following:
   1. Look in the key/value store for a value for `id`
   2. If found, the value will contain mappings from KMS regions to encrypted data key
     - Pick a region
@@ -29,7 +29,6 @@ Notes:
 - It is not an implementation of a key management service from ground up
 - It currently uses DynamoDB as the key/value store, but other stores can easily be swapped in; just need to implement the `Store` interface.
 
-
 ## Get Started
 - (Optional) Use Terraform code in the `terraform` folder to create necessary resources
 - Update `config.toml` file with values specific to your needs and environment. 
@@ -43,7 +42,7 @@ Notes:
 ## Contributing
 Contributions to this project are very welcome! You can even contribute by simply requesting features or reporting bugs.
 
-Things I would like to do in the future (with you can help with!) are:
+Things I would like to do in the future (which you can help with!) are:
 - Write more tests
 - Create a Makefile
 - Create a Dockerfile
