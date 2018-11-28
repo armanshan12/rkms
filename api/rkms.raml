@@ -1,0 +1,23 @@
+#%RAML 1.0
+title: RKMS API
+version: v1
+
+/key:
+  get:
+    description: Get a key for a given id.
+    queryParameters: 
+      id:
+        displayName: ID
+        description: Unique identifier for a given key
+        type: string
+        example: abcd
+        required: true
+    responses: 
+      200:
+        body: 
+          application/json:
+            example:
+              {
+                "id" : "abcd",
+                "key" : "1kZ4L+m6Q1uh4z2wdr15YBWRxyu0VJJiJ7aTKv8UpWc="
+              }
