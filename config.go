@@ -27,8 +27,10 @@ type KMSConfig struct {
 
 // DynamoDBConfig contains information for DynamoDB used for RKMS
 type DynamoDBConfig struct {
-	Region    string `mapstructure:"region"`
-	TableName string `mapstructure:"table_name"`
+	Region               string `mapstructure:"region"`
+	TableName            string `mapstructure:"table_name"`
+	CacheExpiration      int    `mapstructure:"cache_expiration_in_minutes"`
+	CacheCleanupInterval int    `mapstructure:"cache_cleanup_internal_in_minutes"`
 }
 
 // Configuration represents all the configuration information this application needss

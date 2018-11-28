@@ -22,3 +22,5 @@
 [dynamodb]
   region = "us-east-1"
   table_name = "rkms_keys"
+  cache_expiration_in_minutes = 5
+  cache_cleanup_internal_in_minutes = 10

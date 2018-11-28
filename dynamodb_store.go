@@ -2,12 +2,14 @@ package main
 
 import (
 	"context"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
+	cache "github.com/patrickmn/go-cache"
 	logger "github.com/sirupsen/logrus"
 )
 
@@ -15,6 +17,7 @@ import (
 type DynamoDBStore struct {
 	tableName *string
 	client    *dynamodb.DynamoDB
+	keysCache *cache.Cache
 }
 
 type item struct {
@@ -34,11 +37,17 @@ func NewDynamoDBStore(dynamoDBConfig DynamoDBConfig) (*DynamoDBStore, error) {
 	}
 
 	client := dynamodb.New(sess)
-	return &DynamoDBStore{aws.String(dynamoDBConfig.TableName), client}, nil
+	keysCache := cache.New(time.Duration(dynamoDBConfig.CacheExpiration)*time.Minute, time.Duration(dynamoDBConfig.CacheCleanupInterval)*time.Minute)
+	return &DynamoDBStore{aws.String(dynamoDBConfig.TableName), client, keysCache}, nil
 }
 
 // GetEncryptedDataKeys retrieves the encrypted data keys for the given id
 func (s *DynamoDBStore) GetEncryptedDataKeys(ctx context.Context, id string) (map[string]string, error) {
+	//check if id is cached
+	if keys, found := s.keysCache.Get(id); found {
+		return *keys.(*map[string]string), nil
+	}
+
 	input := &dynamodb.GetItemInput{
 		TableName: s.tableName,
 		Key: map[string]*dynamodb.AttributeValue{
@@ -66,6 +75,7 @@ func (s *DynamoDBStore) GetEncryptedDataKeys(ctx context.Context, id string) (ma
 		return nil, err
 	}
 
+	s.keysCache.Set(id, &item.Keys, cache.DefaultExpiration)
 	return item.Keys, nil
 }
 
@@ -95,5 +105,6 @@ func (s *DynamoDBStore) SetEncryptedDataKeysConditionally(ctx context.Context, i
 		return err
 	}
 
+	s.keysCache.Set(id, &encryptedKeysMap, cache.DefaultExpiration)
 	return nil
 }
