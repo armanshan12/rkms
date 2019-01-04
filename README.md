@@ -1,10 +1,10 @@
 # RKMS (Reliable Key Management Service)
 RKMS is a highly available key management service, built on top of AWS's KMS.
 
-
 ## Objective
 While AWS's KMS is an amazing service, it does not have an SLA. As a result, if KMS goes down in the region you are using it in, your application also goes down as it can't encrypt/decrypt data. The idea of RKMS is to replicate your application's data keys across multiple regions, so you can fallback on another region if your main region goes down.
 
+To get a better understanding, check out my [blog post](https://medium.com/@armanshanjani/design-for-failures-up-front-because-they-will-happen-278a044d291a) about the project.
 
 ## Architecture
 
